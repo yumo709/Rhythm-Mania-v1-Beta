@@ -3343,7 +3343,6 @@ export default function GameplayCanvas({
           showKeyLabels: true,
           keyLabels: keyLabelsMapped,
           isFocusMode: isFocusModeRef.current,
-          isMobile: false,
           combo: scoreStateRef.current.combo,
           breaks: songBreaks
         });

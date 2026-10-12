@@ -10,7 +10,7 @@
  * from: https://github.com/yumo-ymspace/RhythmMania
  */
 
-import { Beatmap, CloudBeatmapSource, HitObject, TimingControlPoint } from '../types';
+import { Beatmap, HitObject, TimingControlPoint } from '../types';
 import { AssetLifecycleManager, getMediaCacheKey } from './assetLifecycle';
 import { TempMemoryCache } from './tempMemoryCache';
 import {
@@ -33,7 +33,7 @@ export interface SavedBeatmap extends Beatmap {
   isServerMap?: boolean;
   cloudSetId?: string;
   chartRevisionId?: string;
-  source?: CloudBeatmapSource;
+  source?: 'osuapi';
   sourceSetId?: number;
   sourceChartId?: number;
   originalOsuFilename?: string;

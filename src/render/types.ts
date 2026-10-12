@@ -76,14 +76,6 @@ export interface PlayfieldVisualSettings {
   customSkinColors?: string[];
   squareRenderStyle?: 'rhythmplus' | 'rhythmplus-dynamic';
   receptorColorsByKeyCount?: Record<number, string[]>;
-  /** @deprecated Locked at 1.0 — renderers ignore this and use 100%. */
-  noteOpacity?: number;
-  /** @deprecated Locked at 1.0 — renderers ignore this and use 100%. */
-  receptorOpacity?: number;
-  /** @deprecated Locked at 1.0 — renderers ignore this and use 100%. */
-  noteSizeMultiplier?: number;
-  /** @deprecated Locked at 1.0 — renderers ignore this and use 100%. */
-  receptorSizeMultiplier?: number;
   judgementPositionY?: number;
   laneSeparatorOpacity?: number;
   selectedMods?: string[];
@@ -106,9 +98,6 @@ export interface PlayfieldFrame {
   showKeyLabels: boolean;
   keyLabels: string[];
   isFocusMode: boolean;
-  // Legacy mobile flag. Desktop UI is served as-is to all viewports;
-  // the renderer ignores this and always uses the desktop playfield.
-  isMobile?: boolean;
   combo?: number;
   breaks?: Array<{ startTime: number; endTime: number }>;
   /** Purely visual measure guide lines (osu!lazer mania parity). */

@@ -96,7 +96,6 @@ describe('getVisibleNotes buffer reuse', () => {
     scrollSpeed: 21,
     audioOffset: 0,
     visualOffset: 0,
-    noteOpacity: 1,
     selectedMods: [],
   };
 

@@ -2,7 +2,7 @@
 
 Source code is authoritative. This file is just a navigation aid.
 
-`package.json` version is `latest`; `metadata.json` is `v1 Beta`; `index.html` title and `api/config.ts` + `api/health.ts` fallbacks are `0.9.8`.
+`package.json` version is `latest`; `metadata.json` is `v1 Beta`; `index.html` title and `api/config.ts` + `api/health.ts` fallbacks are `1`.
 
 Work only in the `Rhythm-Mania-v1-Beta` folder. Never touch sibling `rhythm-mania` or `rhythm-mania-beta` folders.
 
@@ -76,14 +76,15 @@ None. No schema, sessions, or leaderboards. Scores/replays/profiles are local-on
 ### Pre-modification Changes
 
 - When I ask you to do something or to implement somthing, first check if you
-fully understand where and what I am asking you to do. 
+fully understand where and what I am asking you to do.
 
-- If you are slightly unclear or my wording was vague, please use more precise 
-wording and ask me even if it seems clear to you.
+- If my wording was vague or I said something conflicting, please use more 
+precise wording and ask me even if it seems clear to you. Try to ask a question 
+even if you think you know the answer, I would rather you ask and be sure.
 
 - As a general rule of thumb, taller and higher is usually vertical, and
 wider and thicker is usually horizontal, unless I explicitly said vertical or
-horizontal.
+horizontal. Ask if you are unsure.
 
 ### Fonts
 

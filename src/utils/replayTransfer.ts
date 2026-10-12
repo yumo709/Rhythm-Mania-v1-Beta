@@ -149,7 +149,3 @@ export function parseReplayImport(
   }
   return { records, rejectedCount };
 }
-
-export function isRmrFilename(name: string): boolean {
-  return name.toLowerCase().endsWith(RMR_EXTENSION);
-}

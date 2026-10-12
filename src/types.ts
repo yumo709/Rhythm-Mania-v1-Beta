@@ -13,36 +13,7 @@
 export type NoteType = 'normal' | 'hold';
 export type HoldRulesVersion = 1 | 2 | 3;
 
-export type CloudBeatmapSource = 'osuapi';
-export type CloudCatalogState = 'pending' | 'active';
 export type StarRatingSource = 'osu-api-download' | 'chart-content' | 'legacy-fallback';
-
-export interface CloudChartRef {
-  chartRevisionId: string;
-  cloudSetId: string;
-  sourceChartId?: number;
-  originalOsuFilename: string;
-  checksum: string;
-  checksumAlgorithm: 'md5' | 'sha256';
-  difficulty: string;
-  keyCount: number;
-  mode: 3;
-  isActive: boolean;
-}
-
-export interface CloudSetSummary {
-  cloudSetId: string;
-  source: CloudBeatmapSource;
-  sourceSetId?: number;
-  title: string;
-  artist: string;
-  creator: string;
-  coverUrl?: string;
-  state: CloudCatalogState;
-  rankStatus?: string;
-  downloadUrl?: string;
-  charts: CloudChartRef[];
-}
 
 export interface HitSample {
   normalSet: number;
@@ -305,15 +276,6 @@ export interface GameSettings {
   customSkinName?: string;
   squareRenderStyle?: 'rhythmplus' | 'rhythmplus-dynamic';
   receptorColorsByKeyCount?: Record<number, string[]>; // per-lane receptor colors for 1K-10K
-  /** @deprecated Locked at 1.0 (100%) for all skins; non-adjustable. Kept for legacy save compat. */
-  noteOpacity?: number;
-  /** @deprecated Locked at 1.0 (100%) for all skins; non-adjustable. Kept for legacy save compat. */
-  receptorOpacity?: number;
-
-  /** @deprecated Locked at 1.0 (100%) for all skins; non-adjustable. Kept for legacy save compat. */
-  noteSizeMultiplier?: number;
-  /** @deprecated Locked at 1.0 (100%) for all skins; non-adjustable. Kept for legacy save compat. */
-  receptorSizeMultiplier?: number;
 
   judgementOpacity?: number; // 0.0 to 1.0 (opacity for judgement text)
   judgementSize?: number; // 0.1 to 1.0 (font size scaling multiplier, default 0.5 = 50%)
@@ -337,4 +299,4 @@ export interface GameSettings {
   difficultyAdjust?: DifficultyAdjustSettings; // Difficulty Adjust (DA) mod overrides
 }
 
-export type GameScreen = 'menu' | 'select' | 'play' | 'results' | 'settings' | 'calibrate' | 'history';
+export type GameScreen = 'menu' | 'select' | 'play' | 'results' | 'settings' | 'history';

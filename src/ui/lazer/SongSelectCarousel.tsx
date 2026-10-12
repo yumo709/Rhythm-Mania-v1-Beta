@@ -687,6 +687,10 @@ export function SongSelectCarousel({
   const DIFF_SELECTED_MR_PX = -4;
   const DIFF_RANGE_PX = 220;
   const DIFF_MAX_EXTRA_PX = 10;
+  // Hovered (non-selected) diff row sheds this much left indent so it reads
+  // a touch longer, right edge still pinned. Subtle: stays well short of
+  // the selected row (26 - 3 = 23px min indent vs -11px selected).
+  const HOVER_DIFF_REVEAL_PX = 3;
 
   const focusKey = expandedSongKey || selectedGroupKey;
   let focusIndex = songGroups.findIndex((g) => g.songKey === focusKey);
@@ -698,6 +702,11 @@ export function SongSelectCarousel({
   expandedKeyRef.current = expandedSongKey;
   const selectedMapIdRef = useRef(selectedMapId);
   selectedMapIdRef.current = selectedMapId;
+  // Diff id currently hovered (delegated pointer tracking on the container).
+  // The taper sheds left indent for it so the row reveals more width with
+  // the right edge pinned — layout, never a stretch transform. Inline taper
+  // margins win over CSS :hover, so this must live in the taper, not CSS.
+  const hoveredDiffRef = useRef<string | null>(null);
   const groupsRef = useRef(songGroups);
   groupsRef.current = songGroups;
   const itemEls = useRef(new Map<string, HTMLDivElement>());
@@ -835,8 +844,10 @@ export function SongSelectCarousel({
             const center = rect.top - containerRect.top + container.scrollTop + rect.height / 2;
             const t = Math.min(1, Math.abs(center - viewCenter) / DIFF_RANGE_PX);
             const extra = Math.round(DIFF_MAX_EXTRA_PX * Math.pow(t, 0.85));
-            // Left indent tapers; right stays stuck to the screen edge.
-            jobs.push({ el: row, ml: `${DIFF_BASE_ML_PX + extra}px`, mr: `${DIFF_BASE_MR_PX}px` });
+            // Left indent tapers; hovered row sheds indent to reveal more
+            // width. Right stays stuck to the screen edge either way.
+            const hoverReveal = id === hoveredDiffRef.current ? HOVER_DIFF_REVEAL_PX : 0;
+            jobs.push({ el: row, ml: `${DIFF_BASE_ML_PX + extra - hoverReveal}px`, mr: `${DIFF_BASE_MR_PX}px` });
           });
           for (const j of jobs) {
             if (j.el.style.marginLeft !== j.ml) j.el.style.marginLeft = j.ml;
@@ -923,11 +934,39 @@ export function SongSelectCarousel({
     };
     container.addEventListener('scroll', handleScrollState, { passive: true });
     window.addEventListener('resize', handleResize);
+    // Hover tracking for diff-row width reveal (see hoveredDiffRef): one
+    // delegated pair, no per-row listeners or re-renders.
+    const rowFromEvent = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      const row = target?.closest?.('.lazer-carousel-diff-row') as HTMLElement | null;
+      return row?.dataset.diffId ?? null;
+    };
+    const handlePointerOver = (e: Event) => {
+      const id = rowFromEvent(e);
+      if (hoveredDiffRef.current !== id) {
+        hoveredDiffRef.current = id;
+        scheduleTaper();
+      }
+    };
+    const handlePointerOut = (e: Event) => {
+      const row = (e.target as HTMLElement | null)?.closest?.('.lazer-carousel-diff-row') as HTMLElement | null;
+      if (!row) return;
+      const to = (e as PointerEvent).relatedTarget as HTMLElement | null;
+      if (to && row.contains(to)) return;
+      if (hoveredDiffRef.current === (row.dataset.diffId ?? null)) {
+        hoveredDiffRef.current = null;
+        scheduleTaper();
+      }
+    };
+    container.addEventListener('pointerover', handlePointerOver);
+    container.addEventListener('pointerout', handlePointerOut);
     // Re-measure after expand/collapse animations settle (heights change).
     const t1 = window.setTimeout(() => { measureCenters(); scheduleTaper(); }, 120);
     const t2 = window.setTimeout(() => { measureCenters(); scheduleTaper(); }, 420);
     return () => {
       container.removeEventListener('scroll', handleScrollState);
+      container.removeEventListener('pointerover', handlePointerOver);
+      container.removeEventListener('pointerout', handlePointerOut);
       window.removeEventListener('resize', handleResize);
       window.clearTimeout(t1);
       window.clearTimeout(t2);

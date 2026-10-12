@@ -57,11 +57,6 @@ export function lightenCached(color: string, amount: number): [number, number, n
   return [Math.min(1, r * f), Math.min(1, g * f), Math.min(1, b * f)];
 }
 
-export function tupleWithAlpha(rgb: readonly [number, number, number], alpha: number): [number, number, number, number] {
-  const a = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
-  return [rgb[0], rgb[1], rgb[2], a];
-}
-
 /**
  * Fast `rgba(r,g,b,a)` string builder on top of the cached parse.
  * Alpha is quantized to 3 decimals so HD fades still hit the cache.
@@ -82,37 +77,6 @@ export function cachedHexToRgba(color: string | undefined, alpha: number): strin
     if (oldest !== undefined) rgbaStringCache.delete(oldest);
   }
   return out;
-}
-
-function rgbaStringFromUnitRgb(r: number, g: number, b: number, alpha: number): string {
-  const a = Math.max(0, Math.min(1, alpha));
-  const key = `u:${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)}|${a.toFixed(3)}`;
-  const hit = rgbaStringCache.get(key);
-  if (hit !== undefined) return hit;
-  const out = `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a.toFixed(3)})`;
-  rgbaStringCache.set(key, out);
-  if (rgbaStringCache.size > MAX_RGBA_STRINGS) {
-    const oldest = rgbaStringCache.keys().next().value as string | undefined;
-    if (oldest !== undefined) rgbaStringCache.delete(oldest);
-  }
-  return out;
-}
-
-/** Cached `argonDarken(color, amount)` as an `rgba()` string with alpha. No intermediate strings. */
-export function cachedDarkenRgba(color: string, amount: number, alpha: number): string {
-  const [r, g, b] = darkenCached(color, amount);
-  return rgbaStringFromUnitRgb(r, g, b, alpha);
-}
-
-/** Cached `argonLighten(color, amount)` as an `rgba()` string with alpha. No intermediate strings. */
-export function cachedLightenRgba(color: string, amount: number, alpha: number): string {
-  const [r, g, b] = lightenCached(color, amount);
-  return rgbaStringFromUnitRgb(r, g, b, alpha);
-}
-
-/** Test/debug helper: current cache sizes. */
-export function colorCacheStats(): { rgb: number; rgbaStrings: number } {
-  return { rgb: rgbCache.size, rgbaStrings: rgbaStringCache.size };
 }
 
 /** Test/debug helper: clear caches. */

@@ -10,7 +10,6 @@
  * from: https://github.com/yumo-ymspace/RhythmMania
  */
 
-import { parseCssColor } from './color';
 import type { PlayfieldVisualSettings } from './types';
 import type { HitObject } from '../types';
 
@@ -104,18 +103,6 @@ export function getArgonColumnColor(keyCount: number, columnIndex: number): stri
 
 export function argonPaletteForKeyCount(keyCount: number): string[] {
   return Array.from({ length: keyCount }, (_, i) => getArgonColumnColor(keyCount, i));
-}
-
-export function argonDarken(color: string, amount: number): string {
-  const parsed = parseCssColor(color);
-  const factor = 1 / (1 + amount);
-  return `rgb(${Math.round(parsed.r * factor)},${Math.round(parsed.g * factor)},${Math.round(parsed.b * factor)})`;
-}
-
-export function argonLighten(color: string, amount: number): string {
-  const parsed = parseCssColor(color);
-  const factor = 1 + amount;
-  return `rgb(${Math.min(255, Math.round(parsed.r * factor))},${Math.min(255, Math.round(parsed.g * factor))},${Math.min(255, Math.round(parsed.b * factor))})`;
 }
 
 /**

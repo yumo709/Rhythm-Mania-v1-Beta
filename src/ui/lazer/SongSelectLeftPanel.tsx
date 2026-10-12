@@ -12,7 +12,7 @@
 
 import React, { useMemo, useState } from 'react';
 import {
-  Heart, Play, Clock, Activity, Award, Info, ChevronDown, Lock, Check
+  Heart, Play, Clock, Activity, Award, Info, ChevronDown
 } from 'lucide-react';
 import { Beatmap, GameSettings, PlayHistoryRecord } from '../../types';
 import { calculateDominantBpm } from '../../utils/beatmapParser';
@@ -153,9 +153,30 @@ export const SongSelectLeftPanel: React.FC<SongSelectLeftPanelProps> = ({
   const [rankingSort, setRankingSort] = useState<RankingSortKey>('score');
   const [modsOnly, setModsOnly] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [scopeOpen, setScopeOpen] = useState(false);
   const activeSortLabel =
     RANKING_SORT_OPTIONS.find((o) => o.key === rankingSort)?.label || 'Score';
   const selectedMods = settings.selectedMods || [];
+  // Slant offsets for the ranking dropdown popups: same 10.1° "/" treatment
+  // as the top-right wedge menus — 21px rows, 10px chrome (see
+  // tokens.css .lazer-filter-menu, shared with .lazer-song-filter-row).
+  // 1-decimal slant; the stagger step below (21 x S/menuH) keeps the pill
+  // column leaning with the panel instead of ~0.8° steeper (S/n).
+  const rankingSlantFor = (optionCount: number): number =>
+    Math.round((optionCount * 21 + 10) * Math.tan((10.1 * Math.PI) / 180) * 10) / 10;
+  const rankingShiftFor = (s: number, optionCount: number, i: number): number => {
+    const menuH = optionCount * 21 + 10;
+    const step = (21 * s) / menuH;
+    return s / 2 + ((optionCount - 1) / 2 - i) * step;
+  };
+  // 1-decimal stagger margins; MR derives from rounded ML so ML+MR = S
+  // exactly (uniform pill widths, identical to the wedge menus).
+  const rankingOptMargins = (s: number, n: number, i: number): React.CSSProperties => {
+    const ml = Math.round(rankingShiftFor(s, n, i) * 10) / 10;
+    return { marginLeft: `${ml}px`, marginRight: `${s - ml}px` };
+  };
+  const scopeSlant = rankingSlantFor(1);
+  const sortSlant = rankingSlantFor(RANKING_SORT_OPTIONS.length);
 
   const displayedScores = useMemo(() => {
     const pool = modsOnly
@@ -278,27 +299,66 @@ export const SongSelectLeftPanel: React.FC<SongSelectLeftPanelProps> = ({
             </button>
 
             {activeTab === 'ranking' && (
-              <div className="flex items-center gap-2 ml-3 flex-wrap">
-                <span
-                  className="lazer-ranking-pill is-scope is-locked"
-                  title="Online rankings unavailable — local scores only"
-                  aria-disabled="true"
-                >
-                  <span className="opacity-60 font-bold">Scope</span>
-                  <span>Local</span>
-                  <Lock className="h-3 w-3 opacity-60" />
-                </span>
-                <span className="lazer-ranking-sort-wrap">
+              <div className="flex items-center gap-2 ml-3 flex-wrap lazer-ranking-filter-row">
+                {/* Scope: joined label + dropdown, same slanted pair as the
+                    top-right sort/group/collection pills. Local-only (online
+                    rankings unavailable), so the menu lists a single option. */}
+                <div className="relative flex items-center gap-0">
+                  <span className="lazer-filter-tab">Scope</span>
                   <button
                     type="button"
-                    onClick={() => setSortOpen((v) => !v)}
-                    className="lazer-ranking-pill is-button"
+                    onClick={() => {
+                      setScopeOpen((v) => !v);
+                      setSortOpen(false);
+                    }}
+                    className="lazer-filter-select"
+                    aria-haspopup="listbox"
+                    aria-expanded={scopeOpen}
+                    title="Online rankings unavailable — local scores only"
+                  >
+                    <span className="truncate max-w-[140px]">Local</span>
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                  </button>
+                  {scopeOpen && (
+                    <>
+                      <span
+                        className="fixed inset-0 z-30 cursor-default"
+                        onClick={() => setScopeOpen(false)}
+                      />
+                      <span
+                        className="absolute right-0 top-full mt-1 z-40 min-w-[150px] lazer-filter-menu"
+                        style={{ '--dd-slant': `${scopeSlant}px` } as React.CSSProperties}
+                        role="listbox"
+                      >
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected="true"
+                          onClick={() => setScopeOpen(false)}
+                          style={rankingOptMargins(scopeSlant, 1, 0)}
+                          className="lazer-filter-opt px-3 py-[3px] text-[12px] leading-tight transition-colors cursor-pointer is-active text-white"
+                        >
+                          Local
+                        </button>
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* Sort: joined label + dropdown, same slanted pair. */}
+                <div className="relative flex items-center gap-0">
+                  <span className="lazer-filter-tab">Sort</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOpen((v) => !v);
+                      setScopeOpen(false);
+                    }}
+                    className="lazer-filter-select"
                     aria-haspopup="listbox"
                     aria-expanded={sortOpen}
                   >
-                    <span className="opacity-60 font-bold">Sort</span>
-                    <span>{activeSortLabel}</span>
-                    <ChevronDown className="h-3 w-3 opacity-60" />
+                    <span className="truncate max-w-[140px]">{activeSortLabel}</span>
+                    <ChevronDown className="h-3 w-3 opacity-70" />
                   </button>
                   {sortOpen && (
                     <>
@@ -306,31 +366,39 @@ export const SongSelectLeftPanel: React.FC<SongSelectLeftPanelProps> = ({
                         className="fixed inset-0 z-30 cursor-default"
                         onClick={() => setSortOpen(false)}
                       />
-                      <span className="lazer-ranking-sort-menu" role="listbox">
-                        {RANKING_SORT_OPTIONS.map((opt) => (
+                      <span
+                        className="absolute right-0 top-full mt-1 z-40 min-w-[150px] lazer-filter-menu"
+                        style={{ '--dd-slant': `${sortSlant}px` } as React.CSSProperties}
+                        role="listbox"
+                      >
+                        {RANKING_SORT_OPTIONS.map((opt, i) => (
                           <button
                             key={opt.key}
                             type="button"
                             role="option"
                             aria-selected={rankingSort === opt.key}
+                            style={rankingOptMargins(sortSlant, RANKING_SORT_OPTIONS.length, i)}
                             onClick={() => {
                               setRankingSort(opt.key);
                               setSortOpen(false);
                             }}
-                            className={`lazer-ranking-sort-option${rankingSort === opt.key ? ' is-selected' : ''}`}
+                            className={`lazer-filter-opt px-3 py-[3px] text-[12px] leading-tight transition-colors cursor-pointer ${
+                              rankingSort === opt.key ? 'is-active text-white' : 'text-slate-200 hover:text-white'
+                            }`}
                           >
                             {opt.label}
-                            {rankingSort === opt.key && <Check className="h-3 w-3" />}
                           </button>
                         ))}
                       </span>
                     </>
                   )}
-                </span>
+                </div>
+                {/* Selected Mods: single slanted pill toggle (filters to the
+                    currently selected mods), same family as the pairs. */}
                 <button
                   type="button"
                   onClick={() => setModsOnly((v) => !v)}
-                  className={`lazer-ranking-pill is-button${modsOnly ? ' is-active' : ' opacity-80'}`}
+                  className={`lazer-filter-single${modsOnly ? ' is-active' : ''}`}
                   aria-pressed={modsOnly}
                   title={
                     selectedMods.length === 0
@@ -543,70 +611,117 @@ export const SongSelectLeftPanel: React.FC<SongSelectLeftPanelProps> = ({
           </button>
 
           {activeTab === 'ranking' && (
-            <div className="flex items-center gap-2 ml-3 flex-wrap">
-              <span
-                className="lazer-ranking-pill is-scope is-locked"
-                title="Online rankings unavailable — local scores only"
-                aria-disabled="true"
-              >
-                <span className="opacity-60 font-bold">Scope</span>
-                <span>Local</span>
-                <Lock className="h-3 w-3 opacity-60" />
-              </span>
-              <span className="lazer-ranking-sort-wrap">
-                <button
-                  type="button"
-                  onClick={() => setSortOpen((v) => !v)}
-                  className="lazer-ranking-pill is-button"
-                  aria-haspopup="listbox"
-                  aria-expanded={sortOpen}
-                >
-                  <span className="opacity-60 font-bold">Sort</span>
-                  <span>{activeSortLabel}</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </button>
-                {sortOpen && (
-                  <>
-                    <span
-                      className="fixed inset-0 z-30 cursor-default"
-                      onClick={() => setSortOpen(false)}
-                    />
-                    <span className="lazer-ranking-sort-menu" role="listbox">
-                      {RANKING_SORT_OPTIONS.map((opt) => (
+              <div className="flex items-center gap-2 ml-3 flex-wrap lazer-ranking-filter-row">
+                {/* Scope: joined label + dropdown, same slanted pair as the
+                    top-right sort/group/collection pills. Local-only (online
+                    rankings unavailable), so the menu lists a single option. */}
+                <div className="relative flex items-center gap-0">
+                  <span className="lazer-filter-tab">Scope</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScopeOpen((v) => !v);
+                      setSortOpen(false);
+                    }}
+                    className="lazer-filter-select"
+                    aria-haspopup="listbox"
+                    aria-expanded={scopeOpen}
+                    title="Online rankings unavailable — local scores only"
+                  >
+                    <span className="truncate max-w-[140px]">Local</span>
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                  </button>
+                  {scopeOpen && (
+                    <>
+                      <span
+                        className="fixed inset-0 z-30 cursor-default"
+                        onClick={() => setScopeOpen(false)}
+                      />
+                      <span
+                        className="absolute right-0 top-full mt-1 z-40 min-w-[150px] lazer-filter-menu"
+                        style={{ '--dd-slant': `${scopeSlant}px` } as React.CSSProperties}
+                        role="listbox"
+                      >
                         <button
-                          key={opt.key}
                           type="button"
                           role="option"
-                          aria-selected={rankingSort === opt.key}
-                          onClick={() => {
-                            setRankingSort(opt.key);
-                            setSortOpen(false);
-                          }}
-                          className={`lazer-ranking-sort-option${rankingSort === opt.key ? ' is-selected' : ''}`}
+                          aria-selected="true"
+                          onClick={() => setScopeOpen(false)}
+                          style={rankingOptMargins(scopeSlant, 1, 0)}
+                          className="lazer-filter-opt px-3 py-[3px] text-[12px] leading-tight transition-colors cursor-pointer is-active text-white"
                         >
-                          {opt.label}
-                          {rankingSort === opt.key && <Check className="h-3 w-3" />}
+                          Local
                         </button>
-                      ))}
-                    </span>
-                  </>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={() => setModsOnly((v) => !v)}
-                className={`lazer-ranking-pill is-button${modsOnly ? ' is-active' : ' opacity-80'}`}
-                aria-pressed={modsOnly}
-                title={
-                  selectedMods.length === 0
-                    ? 'Show only plays with no mods'
-                    : `Show only plays set with: ${selectedMods.join(' ')}`
-                }
-              >
-                Selected Mods
-              </button>
-            </div>
-          )}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* Sort: joined label + dropdown, same slanted pair. */}
+                <div className="relative flex items-center gap-0">
+                  <span className="lazer-filter-tab">Sort</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOpen((v) => !v);
+                      setScopeOpen(false);
+                    }}
+                    className="lazer-filter-select"
+                    aria-haspopup="listbox"
+                    aria-expanded={sortOpen}
+                  >
+                    <span className="truncate max-w-[140px]">{activeSortLabel}</span>
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                  </button>
+                  {sortOpen && (
+                    <>
+                      <span
+                        className="fixed inset-0 z-30 cursor-default"
+                        onClick={() => setSortOpen(false)}
+                      />
+                      <span
+                        className="absolute right-0 top-full mt-1 z-40 min-w-[150px] lazer-filter-menu"
+                        style={{ '--dd-slant': `${sortSlant}px` } as React.CSSProperties}
+                        role="listbox"
+                      >
+                        {RANKING_SORT_OPTIONS.map((opt, i) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            role="option"
+                            aria-selected={rankingSort === opt.key}
+                            style={rankingOptMargins(sortSlant, RANKING_SORT_OPTIONS.length, i)}
+                            onClick={() => {
+                              setRankingSort(opt.key);
+                              setSortOpen(false);
+                            }}
+                            className={`lazer-filter-opt px-3 py-[3px] text-[12px] leading-tight transition-colors cursor-pointer ${
+                              rankingSort === opt.key ? 'is-active text-white' : 'text-slate-200 hover:text-white'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* Selected Mods: single slanted pill toggle (filters to the
+                    currently selected mods), same family as the pairs. */}
+                <button
+                  type="button"
+                  onClick={() => setModsOnly((v) => !v)}
+                  className={`lazer-filter-single${modsOnly ? ' is-active' : ''}`}
+                  aria-pressed={modsOnly}
+                  title={
+                    selectedMods.length === 0
+                      ? 'Show only plays with no mods'
+                      : `Show only plays set with: ${selectedMods.join(' ')}`
+                  }
+                >
+                  Selected Mods
+                </button>
+              </div>
+            )}
         </div>
       </div>
 

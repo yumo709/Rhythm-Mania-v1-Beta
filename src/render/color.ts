@@ -79,16 +79,3 @@ export function cssColorToHex(value: string | undefined, fallback = '#ffffff'): 
   const color = parseCssColor(value, fallback);
   return `#${[color.r, color.g, color.b].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
 }
-
-export function cssColorAlpha(value: string | undefined, fallback = '#ffffff'): number {
-  return parseCssColor(value, fallback).alpha;
-}
-
-export function hexToRgba(value: string | undefined, alpha: number): string {
-  const color = parseCssColor(value);
-  return `rgba(${color.r},${color.g},${color.b},${clampAlpha(color.alpha * alpha)})`;
-}
-
-export function applyCssAlpha(value: string | undefined, alpha: number): string {
-  return hexToRgba(value, alpha);
-}

@@ -145,13 +145,6 @@ export function hexWithAlpha(hex: string, alpha: number): string {
   return `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 }
 
-/** Scales an '#rrggbb' colour towards black (factor 1 keeps it as-is). */
-export function darkenHex(hex: string, factor: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  const f = Math.max(0, Math.min(1, factor));
-  return rgbToHex(r * f, g * f, b * f);
-}
-
 function relativeLuminance(hex: string): number {
   const lin = (c: number) => {
     const s = c / 255;

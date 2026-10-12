@@ -365,16 +365,11 @@ export function sanitizeSettings(parsed: unknown, defaultSettings: GameSettings)
       ? 'rhythmplus-dynamic'
       : settings.squareRenderStyle === 'rhythmplus' ? 'rhythmplus' : undefined,
     receptorColorsByKeyCount: sanitizeLanePalettes(settings.receptorColorsByKeyCount, defaultSettings.receptorColorsByKeyCount),
-    // Note/receptor size + opacity are permanently locked at 100% for all skins (non-adjustable).
-    noteOpacity: 1.0,
-    receptorOpacity: 1.0,
     judgementOpacity: clamp(settings.judgementOpacity, 0, 1, defaultSettings.judgementOpacity || 1.0),
     judgementSize: clamp(settings.judgementSize, 0.1, 1.0, defaultSettings.judgementSize || 0.5),
     judgementPositionY: clamp(settings.judgementPositionY, 20, 85, defaultSettings.judgementPositionY || 50),
     comboPositionY: clamp(settings.comboPositionY, 5, 85, defaultSettings.comboPositionY || 30),
     laneSeparatorOpacity: clamp(settings.laneSeparatorOpacity, 0, 1, defaultSettings.laneSeparatorOpacity || 0.30),
-    noteSizeMultiplier: 1.0,
-    receptorSizeMultiplier: 1.0,
      playfieldWidthPercent: clamp(settings.playfieldWidthPercent, widthMin, widthMax, Math.max(widthMin, Math.min(widthMax, defaultSettings.playfieldWidthPercent || 15))),
     selectedMods: selectedMods,
     bindPause: sanitizeString(settings.bindPause, defaultSettings.bindPause || 'escape', 15),

@@ -82,14 +82,34 @@ function getGradeBadgeClass(grade: string): string {
 
 /* Sort/group/collection dropdown slant: S = menu H x tan10.1° (same
    lean as the row pills; see tokens.css .lazer-filter-menu). A menu row
-   is 14px (12px text, leading-none + 2x1px padding), panel chrome ~10px
-   (py-1 + border). Computed per menu because the three menus list
-   different option counts (different heights => different S for the
-   same angle). */
+   is ~21px (12px text, leading-tight ~15px + 2x3px padding), rows touch
+   with no gap, panel chrome ~10px (py-1 + border). Computed per menu
+   because the three menus list different option counts (different
+   heights => different S for the same angle). */
 const DD_SLANT_TAN = Math.tan((10.1 * Math.PI) / 180);
+const DD_OPT_ROW_H = 21;
+const DD_MENU_CHROME = 10;
 function menuSlantFor(optionCount: number): number {
-  return Math.round((optionCount * 14 + 10) * DD_SLANT_TAN);
+  return Math.round((optionCount * DD_OPT_ROW_H + DD_MENU_CHROME) * DD_SLANT_TAN);
 }
+/* Stagger offset for one option row so the pill COLUMN leans exactly with
+   the panel's slanted edges: step = ROW_H x tanθ = ROW_H x S / MENU_H,
+   centered (ML+MR = S still holds, so every pill keeps one identical
+   width). NOTE: the old step S/n spreads the full slant S over only the
+   row band ((n-1) x 21px, not the full menu H), so the column leans
+   ~0.8° steeper than the panel (Sort: 10.8° vs 10.0°) and the painted
+   pill insets seesaw ±0.8px top-to-bottom — pills read as slanting
+   differently from the box behind them. */
+function menuShiftFor(s: number, optionCount: number, i: number): number {
+  const menuH = optionCount * DD_OPT_ROW_H + DD_MENU_CHROME;
+  const step = (DD_OPT_ROW_H * s) / menuH;
+  return s / 2 + ((optionCount - 1) / 2 - i) * step;
+}
+
+// Star-rating filter range. The slider spans 0..STAR_FILTER_MAX, and the
+// top position means "no upper limit" so charts above the slider range
+// (MAX_STAR_RATING is 20) still show by default.
+const STAR_FILTER_MAX = 15;
 
 interface SongSelectProps {
   settings: GameSettings;
@@ -150,7 +170,27 @@ export default function SongSelect({
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('rhythm_mania_v1_last_diff_by_song');
-        return saved ? JSON.parse(saved) : {};
+        if (!saved) return {};
+        const parsed = JSON.parse(saved);
+        if (!parsed || typeof parsed !== 'object') return {};
+        // Drop legacy title-scoped keys ("artist - title" and
+        // "diffname:artist - title"): they are shared by every song with the
+        // same name, so keeping them lets selecting one same-name song
+        // resume the other's difficulty. Only songKey-scoped keys
+        // (package_*/local_map_* and their diffname: variants) are unique
+        // per song group.
+        const cleaned: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (typeof v !== 'string') continue;
+          if (k.startsWith('package_') || k.startsWith('local_map_')) {
+            cleaned[k] = v;
+          } else if (
+            (k.startsWith('diffname:package_') || k.startsWith('diffname:local_map_'))
+          ) {
+            cleaned[k] = v;
+          }
+        }
+        return cleaned;
       } catch (e) {
         console.warn('Failed to load last selected difficulty by song:', e);
       }
@@ -260,7 +300,7 @@ export default function SongSelect({
   // High-fidelity options, filters, details state variables
   const [showPreplayOptions, setShowPreplayOptions] = useState<boolean>(false);
   const [minStar, setMinStar] = useState<number>(0.0);
-  const [maxStar, setMaxStar] = useState<number>(10.0);
+  const [maxStar, setMaxStar] = useState<number>(STAR_FILTER_MAX);
   const [sortBy, setSortBy] = useState<string>('Title');
   const [groupBy, setGroupBy] = useState<string>('None');
   const [collectionFilter, setCollectionFilter] = useState<string>('All beatmaps');
@@ -270,7 +310,7 @@ export default function SongSelect({
   const starTrackRef = useRef<HTMLDivElement | null>(null);
   const starDragTargetRef = useRef<'min' | 'max' | null>(null);
 
-  const clampStar = (v: number): number => Math.max(0, Math.min(10, Math.round(v * 10) / 10));
+  const clampStar = (v: number): number => Math.max(0, Math.min(STAR_FILTER_MAX, Math.round(v * 10) / 10));
 
   const setStarBound = (which: 'min' | 'max', v: number) => {
     const nv = clampStar(v);
@@ -288,7 +328,7 @@ export default function SongSelect({
     if (!el) return 0;
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0) return 0;
-    return clampStar(((clientX - rect.left) / rect.width) * 10);
+    return clampStar(((clientX - rect.left) / rect.width) * STAR_FILTER_MAX);
   };
 
   const handleStarTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -335,7 +375,10 @@ export default function SongSelect({
     }
   };
 
-  // Favorites: stable song-group keys persisted to localStorage
+  // Favorites: stable song-group keys persisted to localStorage.
+  // Only songKey-scoped values (package_*/local_map_*) are kept: legacy
+  // title-scoped entries ("artist - title") are shared by same-name songs,
+  // so keeping them would favorite/unfavorite every same-name banner together.
   const [favoriteSongs, setFavoriteSongs] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -345,6 +388,7 @@ export default function SongSelect({
           if (Array.isArray(parsed)) {
             return parsed
               .filter((k): k is string => typeof k === 'string' && k.length > 0 && k.length <= 300)
+              .filter((k) => k.startsWith('package_') || k.startsWith('local_map_'))
               .slice(0, 5000);
           }
         }
@@ -510,9 +554,9 @@ export default function SongSelect({
         if (!title.includes(q) && !artist.includes(q) && !(creator && creator.includes(q))) return false;
       }
 
-      // Filter by dynamic star limits
+      // Filter by dynamic star limits (max at the top position = no upper bound)
       const rating = getStarRating(map);
-      if (rating < minStar || rating > maxStar) return false;
+      if (rating < minStar || (maxStar < STAR_FILTER_MAX && rating > maxStar)) return false;
 
       // Filter by collection
       if (collectionFilter === 'Favorites') {
@@ -543,11 +587,16 @@ export default function SongSelect({
 
   const persistLastDifficultyForMap = useCallback((map: any) => {
     if (!map?.id) return;
-    const keys = new Set<string>([getMapSongKey(map), getArtistTitleKey(map)]);
+    // SongKey-scoped only. Never write artist/title keys: two different
+    // songs with the same name share that string, so writing it here lets
+    // one song overwrite (and later steal) the other's remembered difficulty.
+    const songKey = getMapSongKey(map);
+    const keys = new Set<string>([songKey]);
     if (map.parentPackageId) keys.add(`package_${map.parentPackageId}`);
     if (map.packageId) keys.add(`package_${String(map.packageId).replace(/^pkg_/, '')}`);
-    // Difficulty name fallback (used when map ids are rebuilt on re-import)
-    const metaKey = `diffname:${getArtistTitleKey(map)}`;
+    // Difficulty name fallback (used when map ids are rebuilt on re-import),
+    // scoped to this song group so same diff names in same-name songs can't collide.
+    const metaKey = `diffname:${songKey}`;
 
     setLastSelectedDifficultyBySong(prev => {
       const updated = { ...prev };
@@ -561,7 +610,7 @@ export default function SongSelect({
       }
       return updated;
     });
-  }, [getMapSongKey, getArtistTitleKey]);
+  }, [getMapSongKey]);
 
   // Save selected difficulty for the song (selection changes are rare;
   // a single linear find here is negligible vs the per-frame filter path).
@@ -684,25 +733,17 @@ export default function SongSelect({
     pushAll(group.maps);
     // Include unfiltered sibling diffs (star/search filters can hide the last-picked difficulty from group.maps).
     // Served from the cached songKey -> diffs index: no scan, no .osz unpack.
-    const artistTitleKey = getArtistTitleKey(group);
+    // Strictly songKey-scoped: never pull in same-title maps from other
+    // packages — two different songs can share an artist/title, and mixing
+    // them here is what made clicking one banner select the other (and flip
+    // which banner renders long/selected vs short).
     pushAll(songMapsByKey.get(group.songKey));
-    if (group.songKey === artistTitleKey) {
-      // Legacy artist-title groups: siblings share the key already.
-    } else {
-      for (const m of mergedCustomMaps) {
-        if (getArtistTitleKey(m) === artistTitleKey && !seen.has(m.id)) {
-          pushAll([m]);
-          break;
-        }
-      }
-    }
 
     if (pool.length === 0) return null;
 
     const memory = lastSelectedDifficultyBySongRef.current;
     const candidateIds = [
       memory[group.songKey],
-      memory[artistTitleKey],
       group.packageId ? memory[`package_${String(group.packageId).replace(/^pkg_/, '')}`] : undefined,
     ].filter(Boolean) as string[];
 
@@ -711,7 +752,9 @@ export default function SongSelect({
       if (found) return found;
     }
 
-    const savedDiffName = memory[`diffname:${artistTitleKey}`];
+    // Diff-name fallback is also songKey-scoped so identical diff names in
+    // same-title songs can't resolve across songs.
+    const savedDiffName = memory[`diffname:${group.songKey}`];
     if (savedDiffName) {
       const byName = pool.find((m) => String(m.difficulty || '') === savedDiffName);
       if (byName) return byName;
@@ -723,7 +766,7 @@ export default function SongSelect({
 
     return pool[0];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songMapsByKey, getArtistTitleKey, getMapSongKey, mergedCustomMaps]);
+  }, [songMapsByKey, getMapSongKey]);
 
   const selectedCustomMap = React.useMemo(
     () => (selectedCustomMapId ? mapById.get(selectedCustomMapId) || null : null),
@@ -1470,7 +1513,14 @@ export default function SongSelect({
         {/* =======================================================
             RIGHT COLUMN: SEARCH, FILTER, AND CAROUSEL — hud/songselect.jpg
             ======================================================= */}
-        <div className="relative flex-1 flex-col h-full min-h-0 pl-4 pr-2 lg:pl-4 lg:pr-3 pt-0 pb-0 gap-2 overflow-hidden lg:flex-none lg:ml-auto lg:w-[49%] lg:min-w-[400px] lg:max-w-[704px] xl:max-w-[744px] flex">
+        {/* RIGHT COLUMN: SEARCH, FILTER, AND CAROUSEL — hud/songselect.jpg
+            NOTE: overflow-visible (not hidden): the tall Sort dropdown
+            overhangs ~4px left of this column (S=24 parallelogram overhang
+            vs -11.6px slant hug) and the filter shell tucks 8px above it —
+            overflow-hidden clipped the menu's bottom-left fillet. The
+            carousel clips itself (overflow-y-auto + overflow-x-hidden), so
+            the column itself must not clip. */}
+        <div className="relative flex-1 flex-col h-full min-h-0 pl-4 pr-2 lg:pl-4 lg:pr-3 pt-0 pb-0 gap-2 overflow-visible lg:flex-none lg:ml-auto lg:w-[49%] lg:min-w-[400px] lg:max-w-[704px] xl:max-w-[744px] flex">
 
           {/* TOP-RIGHT FILTER BOX — floating overlay: the carousel runs
               full-height to the toolbar behind this shell. */}
@@ -1498,7 +1548,7 @@ export default function SongSelect({
               <div
                 className="lazer-starbar is-interactive"
                 title="Drag the number boxes or anywhere on the bar, or scroll (Shift+scroll for max) to filter"
-                onDoubleClick={() => { setMinStar(0); setMaxStar(10); }}
+                onDoubleClick={() => { setMinStar(0); setMaxStar(STAR_FILTER_MAX); }}
               >
                 <span
                   className="lazer-starbar-value"
@@ -1507,7 +1557,7 @@ export default function SongSelect({
                   onPointerMove={handleStarChipPointerMove}
                   onPointerUp={endStarDrag}
                   onPointerCancel={endStarDrag}
-                  style={{ left: `max(0px, min(calc(${(minStar / 10) * 100}% - 2.4em), calc(100% - 4.7em)))` }}
+                  style={{ left: `max(0px, min(calc(${(minStar / STAR_FILTER_MAX) * 100}% - 2.4em), calc(100% - 4.7em)))` }}
                 >{minStar.toFixed(1)}</span>
                 <div
                   ref={starTrackRef}
@@ -1515,7 +1565,7 @@ export default function SongSelect({
                   role="slider"
                   aria-label="Minimum star rating"
                   aria-valuemin={0}
-                  aria-valuemax={10}
+                  aria-valuemax={STAR_FILTER_MAX}
                   aria-valuenow={minStar}
                   tabIndex={0}
                   onPointerDown={handleStarTrackPointerDown}
@@ -1533,17 +1583,17 @@ export default function SongSelect({
                     } else if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
                       setMinStar(0);
-                      setMaxStar(10);
+                      setMaxStar(STAR_FILTER_MAX);
                     }
                   }}
                 >
                   <span
                     className="lazer-starbar-dim is-left"
-                    style={{ width: `${Math.max(0, Math.min(100, (minStar / 10) * 100))}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, (minStar / STAR_FILTER_MAX) * 100))}%` }}
                   />
                   <span
                     className="lazer-starbar-dim is-right"
-                    style={{ width: `${Math.max(0, Math.min(100, 100 - (maxStar / 10) * 100))}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, 100 - (maxStar / STAR_FILTER_MAX) * 100))}%` }}
                   />
                 </div>
                 <span
@@ -1553,8 +1603,8 @@ export default function SongSelect({
                   onPointerMove={handleStarChipPointerMove}
                   onPointerUp={endStarDrag}
                   onPointerCancel={endStarDrag}
-                  style={{ right: `max(0px, min(calc(${100 - (maxStar / 10) * 100}% - 2.4em), calc(100% - 4.7em)))` }}
-                >{maxStar >= 10 ? '∞' : maxStar.toFixed(1)}</span>
+                  style={{ right: `max(0px, min(calc(${100 - (maxStar / STAR_FILTER_MAX) * 100}% - 2.4em), calc(100% - 4.7em)))` }}
+                >{maxStar >= STAR_FILTER_MAX ? '∞' : maxStar.toFixed(1)}</span>
               </div>
             </div>
           </div>
@@ -1583,27 +1633,51 @@ export default function SongSelect({
                   <>
                     <div className="fixed inset-0 z-30 cursor-default" onClick={() => setOpenFilterMenu(null)} />
                     <div
-                      className="absolute left-0 right-0 top-full mt-1 z-40 bg-[#12121a] border border-white/10 py-1 min-w-[150px] lazer-filter-menu"
+                      className="absolute right-0 top-full mt-1 z-40 min-w-[150px] lazer-filter-menu"
                       style={{ '--dd-slant': `${s}px` } as React.CSSProperties}
                     >
-                      {dd.options.map((opt, i) => (
+                      {dd.options.map((opt, i) => {
+                        // Stagger pill BOXES against the "/" parallelogram
+                        // panel stagger so the PAINTED pill (baked R4 clip
+                        // inset ~1.8px mid-edge) lands ~2px inside both
+                        // slanted panel edges: ML = shift (menuShiftFor:
+                        // ROW_H x S / MENU_H steps centered on S/2, so the
+                        // column leans WITH the panel), MR = S - shift.
+                        // Equal total margin (S) keeps every pill the same
+                        // width regardless of text length. The menu box is
+                        // W+S wide (left: -S, right: 0) so the painted
+                        // panel top lands flush on the pair width W while
+                        // the bottom shifts left by S — same width, left
+                        // edge collinear with the pills above.
+                        const shift = menuShiftFor(s, dd.options.length, i);
+                        // 1-decimal margins: integer rounding alone leaves a
+                        // ~0.3° diagonal error (9.73° vs the panel's 9.97°);
+                        // tenths nail it to ~0.04°. MR derives from rounded
+                        // ML so ML+MR = S exactly (uniform pill widths).
+                        const ml = Math.round(shift * 10) / 10;
+                        const mr = s - ml;
+                        return (
                         <button
                           key={opt}
                           type="button"
-                          style={{ paddingLeft: 12 + Math.round(s * (1 - (i + 0.5) / dd.options.length)) }}
+                          style={{
+                            marginLeft: `${ml}px`,
+                            marginRight: `${mr}px`,
+                          }}
                           onClick={() => {
                             if (dd.key === 'sort') setSortBy(opt);
                             else if (dd.key === 'group') setGroupBy(opt);
                             else setCollectionFilter(opt);
                             setOpenFilterMenu(null);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-[1px] text-left text-[12px] leading-none font-sans transition-colors cursor-pointer ${
-                            dd.value === opt ? 'text-white bg-[#2e7fc4]' : 'text-slate-200 hover:text-white hover:bg-[#2e7fc4]/30'
+                          className={`lazer-filter-opt px-3 py-[3px] text-[12px] leading-tight transition-colors cursor-pointer ${
+                            dd.value === opt ? 'is-active text-white' : 'text-slate-200 hover:text-white'
                           }`}
                         >
                           {opt}
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
