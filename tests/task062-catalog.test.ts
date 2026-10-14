@@ -122,10 +122,7 @@ describe('TASK-062: Catalog Router & Offline Boundaries', () => {
     it('returns mirror sets with stable osuapi_ ids and mania-only charts', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => ({
-          ok: true,
-          status: 200,
-          json: async () => [
+        vi.fn(async () => Response.json([
             {
               SetID: 424242,
               RankedStatus: 1,
@@ -153,8 +150,7 @@ describe('TASK-062: Catalog Router & Offline Boundaries', () => {
                 },
               ],
             },
-          ],
-        })),
+          ])),
       );
       try {
         const { req, res, getStatusCode, getData } = createMockReqRes({

@@ -1,0 +1,27 @@
+{
+  "status": "audit in progress; not an exhaustive sign-off",
+  "commit": "53f99b9",
+  "filesAtStart": 286,
+  "textFiles": 202,
+  "binaryAssets": 83,
+  "dependencyLockFiles": 1,
+  "textAndLockLines": 59639,
+  "runtime": { "node": "24.20.0", "npm": "12.2.0", "react": "19.2.6", "vite": "8.2.1", "typescript": "5.9.3", "tailwind": "4.3.0", "vitest": "4.1.11" },
+  "checks": {
+    "install": "PASS: isolated npm ci --offline --ignore-scripts --no-audit --no-fund; 199 packages. Lifecycle scripts deliberately not executed; existing installation used for build/test baseline.",
+    "lintAndTypecheck": "PASS: npm.cmd run lint (tsc --noEmit; no separate ESLint configuration)",
+    "tests": "PASS: 54 files, 545 tests",
+    "build": "PASS with warning: JavaScript chunk 1031.76 kB / gzip 302.76 kB exceeds 500 kB threshold",
+    "dev": "PASS: Vite on http://localhost:3000; catalog API requests return 404 under bare Vite",
+    "dependencies": "npm audit: 8 high entries, including transitive chains; source-map-js patch available; braces advisory has no patched version"
+  },
+  "architecture": [
+    "React StrictMode boots App; App owns routes, settings, installed maps, local replay history, playback selection and global overlays.",
+    "Local archives -> bounded ZIP extraction -> mania parser -> IndexedDB packages/beatmaps/backgrounds -> blob media cache -> Web Audio/gameplay renderer.",
+    "GameplayCanvas owns live/replay timing; mania ruleset and render math are shared helpers. WebGL2 draws the playfield; React draws HUD and menus.",
+    "Read-only Vercel API endpoints expose config/health and mirror catalog search. Downloads go directly from browser to public mirrors.",
+    "LocalStorage persists settings/history; IndexedDB persists media packages; service worker supplies offline caching. No database/auth/upload service remains.",
+    "Project inventory includes tracked and nonignored project files. Generated dependency trees, build output, Git internals and audit artifacts are not authored project code. Binary assets require format/content/reference inspection, not line-by-line reading."
+  ],
+  "preExistingEdits": "See baseline-status.txt and locally saved pre-existing.patch; preserve concurrent work."
+}

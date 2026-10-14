@@ -12,6 +12,15 @@
 
 /* Lazer chrome tokens. All skins (Argon + legacy) use the lazer top bar. */
 html[data-ui="lazer"] {
+  /* Fluid design unit: 1366x768 baseline (u = 1). Driven live from JS
+     (updateRmUnit: min(vw/1366, vh/768); 1 at/below 720px width).
+     Inner sizes/type/padding/gaps scale as calc(Npx * var(--rm-u));
+     bar widths (100%), scrims and canvas backing stores do not scale. */
+  --rm-u: 1;
+  /* Slant helpers for 10.1deg shells: perpendicular daylight = horizontal * cos,
+     horizontal run = vertical * tan. */
+  --rm-tan-slant: 0.1781;
+  --rm-cos-slant: 0.9845;
   --lazer-ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --lazer-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --lazer-ease-in-sine: cubic-bezier(0.12, 0, 0.39, 0);
@@ -3803,4 +3812,36 @@ html[data-ui="lazer"] {
     width: calc(100vw - 10px);
     height: 158px;
   }
+}
+
+/* ==========================================================================
+   Fluid 1366x768 baseline (--rm-u) for slanted menus.
+   Design px at u = 1 (1366x768); every width/padding scales as N * --rm-u
+   so the perpendicular daylight between slanted sides stays proportional.
+   The rectangular box overlap itself is NOT fixed: ModSelectOverlay computes
+   it live from the measured column height (see modColumnRectGap) so the
+   slanted-perpendicular gap stays G_REF * --rm-u, not -70px at all sizes.
+   At 1366x768 (--rm-u = 1) these equal the legacy fixed px exactly.
+   ========================================================================== */
+html[data-ui="lazer"] .mod-col-preset {
+  width: calc(230px * var(--rm-u, 1));
+}
+@media (min-width: 1024px) {
+  html[data-ui="lazer"] .mod-col-preset {
+    width: calc(240px * var(--rm-u, 1));
+  }
+}
+html[data-ui="lazer"] .mod-col-cat {
+  width: calc(460px * var(--rm-u, 1));
+}
+@media (min-width: 1024px) {
+  html[data-ui="lazer"] .mod-col-cat {
+    width: calc(480px * var(--rm-u, 1));
+  }
+}
+html[data-ui="lazer"] .mod-row-card {
+  max-width: calc(320px * var(--rm-u, 1));
+}
+html[data-ui="lazer"] .mod-row-preset {
+  max-width: calc(140px * var(--rm-u, 1));
 }

@@ -13,7 +13,7 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  X, Search, ChevronLeft, ChevronDown, ChevronUp, Plus,
+  X, Search, ChevronLeft, ChevronDown, ChevronUp, Plus, Save,
   Infinity as InfinityIcon, Rewind, FastForward, ArrowUpToLine,
   Skull, Award, Target, SquareSlash, Eye, Layers, Flashlight,
   Zap, FlipHorizontal, Shuffle, Gauge, ArrowUpDown, Ban,
@@ -506,7 +506,7 @@ export const LazerModCard: React.FC<LazerModCardProps> = ({
 
   if (isComingSoon) {
     return (
-      <div className="group relative w-full max-w-[300px]" style={{ marginLeft: offsetPx }}>
+      <div className="group relative w-full mod-row-card" style={{ marginLeft: offsetPx }}>
         <div
           ref={dyn.setRef}
           title={tooltipText}
@@ -538,7 +538,7 @@ export const LazerModCard: React.FC<LazerModCardProps> = ({
   }
 
   return (
-    <div className="group relative w-full max-w-[300px]" style={{ marginLeft: offsetPx }}>
+    <div className="group relative w-full mod-row-card" style={{ marginLeft: offsetPx }}>
       <button
         type="button"
         ref={dyn.setRef}
@@ -735,13 +735,18 @@ interface ModPreset {
 }
 
 const PRESETS_KEY = 'rhythm_mania_v1_mod_presets';
+/** Fixed personal-preset slot count: the column never scrolls vertically. */
+const PRESET_SLOT_COUNT = 3;
 /* Mod column shell: parallelogram at the UI-standard 10.1deg lean with
    TRUE CIRCULAR R10 fillets baked into every corner (Slant Fillet
-   method — a border-radius cannot round a clip-path cut). Slant run
-   S = 112.2px, sized as straight_width = 630 x tan(10.1deg) onto the
-   reference H = 630px column stretch at 1600x900 (viewport minus
-   banner/toolbar/footer), so theta = atan(112.2/630) = 10.10deg,
-   matching the song-select shells (filter 26px over 146.5px = 10.1deg).
+   method — a border-radius cannot round a clip-path cut). COLUMN_CLIP below
+   is the reference-H output for H = 630px (slant run S = 630 x tan(10.1deg)
+   = 112.2px, theta = atan(112.2/630) = 10.10deg), kept as the first-paint
+   fallback; the live shell clip is rebuilt from the measured section height
+   via buildSlantClip with R scaled by the fluid unit, so the slant stays
+   exact at any viewport size. Design baseline is 1366x768 (fluid unit u = 1,
+   live column height ≈ 521px); the 1600x900 H = 630px figure is the old
+   tuning reference only.
    TL/BR are obtuse 100.1deg joints (T = 10/tan(50.05deg) = 8.4px),
    TR/BL acute 79.9deg joints (T = 10/tan(39.95deg) = 11.9px), arcs
    sampled every ~20deg so segment angles flow 0 -> 10 -> 30 -> 51 ->
@@ -750,18 +755,21 @@ const PRESETS_KEY = 'rhythm_mania_v1_mod_presets';
    (verified monotonic). Every fillet point is a FIXED offset from its
    own corner, so top corners use absolute px while bottom corners anchor
    with calc(100% - Ypx) — the polygon stays exact at ANY column height
-   and any column width. The 40px category colour band is full-bleed paint
-   inside the clipped layer, so its top corners inherit the fillets.
-   Columns overlap with a -70px rectangular gap (70px overlap) between each shell. Rows are sheared
+   and any column width. The 40px (x fluid unit) category colour band is
+   full-bleed paint inside the clipped layer, so its top corners inherit
+   the fillets.
+   Columns overlap so the SLANTED-perpendicular daylight stays constant
+   (MOD_GAP_REF_PERP_PX x fluid unit — exactly -70px rectangular at the
+   1366x768 baseline; see modColumnRectGap). Rows are sheared
    parallelograms at the same 10.1deg (see ROW_CLIP) hugging the top-left;
-   content inset pl-[112px] clears the top-left edge
-   (112.2 x (1 - 20/630) = 108.6px at header mid-height) for header text
-   and rows, and the scroll column keeps mr-[16px] breathing room on the
+   content inset (112 x fluid unit) clears the top-left edge
+   for header text and rows, and the scroll column keeps 16 (x fluid unit)
+   breathing room on the
    right. The native bar is hidden; SlantedScrollList floats a custom
    10.1deg rail + thumb overlay on the column's right side (zero layout
    width, measured live). Personal Presets is half width
-   (w-[230px]/lg:w-[240px]) with compact 80px rows; category columns are
-   w-[460px]/lg:w-[480px] so the scroll container fits stepped 300px rows
+   (w-[230px]/lg:w-[240px]) with 3 fixed non-scrolling slots; category columns are
+   w-[460px]/lg:w-[480px] so the scroll container fits stepped 320px rows
    (maxShift + 300 <= W - 144 + maxShift, i.e. W >= 444) at every scroll
    position. Row boxes step left
    10.3px per index (see columnStepPlan) so left paint edges stay colinear
@@ -785,8 +793,73 @@ const COLUMN_CLIP =
    not a hexagon. */
 const ROW_CLIP =
   'polygon(12.3px 0.0px, calc(100% - 4.8px) 0.0px, calc(100% - 3.4px) 0.2px, calc(100% - 2.2px) 0.9px, calc(100% - 1.3px) 2.0px, calc(100% - 0.8px) 3.3px, calc(100% - 0.8px) 4.7px, calc(100% - 8.3px) calc(100% - 3.3px), calc(100% - 8.7px) calc(100% - 2.2px), calc(100% - 9.3px) calc(100% - 1.3px), calc(100% - 10.1px) calc(100% - 0.6px), calc(100% - 11.1px) calc(100% - 0.2px), calc(100% - 12.3px) 100%, 4.8px 100%, 3.4px calc(100% - 0.2px), 2.2px calc(100% - 0.9px), 1.3px calc(100% - 2.0px), 0.8px calc(100% - 3.3px), 0.8px calc(100% - 4.7px), 8.3px 3.3px, 8.7px 2.2px, 9.3px 1.3px, 10.1px 0.6px, 11.1px 0.2px, 12.3px 0.0px)';
+/* 1366x768 fluid baseline + slant-perpendicular column gaps.
+   Design baseline is 1366x768 (rmU = 1). At the baseline the live column
+   height is MOD_COL_H_REF = 521px and the legacy rectangular box overlap
+   MOD_RECT_REF = -70px leaves a POSITIVE daylight between the slanted sides:
+     S_ref = H_ref * tan(10.1deg) ≈ 92.8px,
+     top insets sum = S_ref + T_OBT + T_ACU ≈ 113.1px,
+     horizontal daylight D_h = -70 + 113.1 ≈ 43.1px,
+     perpendicular daylight G_ref = D_h * cos(10.1deg) ≈ 42.5px.
+   A fixed -70px box overlap cannot hold that daylight when H changes (S grows
+   with H, so the daylight grows ~1.5x from 1366x768 to 1600x900). Instead the
+   rectangular overlap is derived live so the SLANTED-perpendicular gap stays
+   G_ref * rmU:
+     rectGap(H, u) = G_ref*u/cos - H*tan - (T_OBT+T_ACU)*u   (negative = overlap)
+   Column/row widths, content insets, row steps and scrollbar widths scale as
+   N * rmU, so at 1366x768 (u = 1) every value equals its legacy fixed px. */
+export const MOD_SLANT_DEG = 10.1;
+export const MOD_SLANT_TAN = Math.tan((MOD_SLANT_DEG * Math.PI) / 180);
+export const MOD_SLANT_COS = Math.cos((MOD_SLANT_DEG * Math.PI) / 180);
+export const MOD_COLUMN_R = 10;
+export const MOD_T_OBT = MOD_COLUMN_R / Math.tan(((90 + MOD_SLANT_DEG) / 2) * (Math.PI / 180));
+export const MOD_T_ACU = MOD_COLUMN_R / Math.tan(((90 - MOD_SLANT_DEG) / 2) * (Math.PI / 180));
+export const MOD_BASE_W = 1366;
+export const MOD_BASE_H = 768;
+export const MOD_COMPACT_MAX_W = 720;
+/** Live column height measured at the 1366x768 baseline (px). */
+export const MOD_COL_H_REF = 521;
+/** Legacy rectangular box overlap at the baseline (px, negative = overlap). */
+export const MOD_RECT_REF_PX = -70;
+/** Perpendicular daylight between slanted sides at the baseline (px). */
+export const MOD_GAP_REF_PERP_PX =
+  (MOD_RECT_REF_PX + MOD_COL_H_REF * MOD_SLANT_TAN + MOD_T_OBT + MOD_T_ACU) * MOD_SLANT_COS;
+
+/** Fluid unit: 1 at 1366x768; min(vw/1366, vh/768) above 720px width, else 1. */
+export function modRmUnit(viewportW: number, viewportH: number): number {
+  if (!Number.isFinite(viewportW) || !Number.isFinite(viewportH)) return 1;
+  if (viewportW <= 0 || viewportH <= 0) return 1;
+  if (viewportW <= MOD_COMPACT_MAX_W) return 1;
+  const u = Math.min(viewportW / MOD_BASE_W, viewportH / MOD_BASE_H);
+  return Number.isFinite(u) && u > 0 ? u : 1;
+}
+
+/** Rectangular box offset (px, negative = overlap) that holds the slanted
+    perpendicular daylight at G_ref * rmU for the live column height. */
+export function modColumnRectGap(colH: number, rmU: number): number {
+  const h = Number.isFinite(colH) && colH > 0 ? colH : MOD_COL_H_REF;
+  const u = Number.isFinite(rmU) && rmU > 0 ? rmU : 1;
+  const slantSum = h * MOD_SLANT_TAN + (MOD_T_OBT + MOD_T_ACU) * u;
+  const daylightH = (MOD_GAP_REF_PERP_PX * u) / MOD_SLANT_COS;
+  return daylightH - slantSum;
+}
+
+/** Live fluid unit from window size (1 on server / compact). */
+export function useModRmUnit(): number {
+  const [u, setU] = useState<number>(() =>
+    typeof window !== 'undefined' ? modRmUnit(window.innerWidth, window.innerHeight) : 1,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setU(modRmUnit(window.innerWidth, window.innerHeight));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return u;
+}
+
 /** Tangent of the 10.1deg UI slant; maps vertical distances to horizontal run. */
-const SLANT_TAN = Math.tan((10.1 * Math.PI) / 180);
+const SLANT_TAN = MOD_SLANT_TAN;
 
 /* One true slant: builds the sheared-parallelogram clip with TRUE CIRCULAR
    fillets for ANY height at EXACTLY 10.1deg (S = H x tan(10.1deg), so theta
@@ -883,32 +956,62 @@ function useDynamicSlantClip(R: number, refH: number, fallbackClip: string): { s
   return { setRef, clip };
 }
 /* Row stepping for slanted colinearity: every row box shifts left by
-   ROW_STEP_PX per index (10.3px ≈ 58px pitch x tan(10.1deg), so the
-   left paint edges land on one straight 10.1deg line
-   parallel to the column slant). The outer content inset shrinks by the
-   same maxShift (BASE_CONTENT_PL 112 minus maxShift) and the header takes
+   10.3 x fluid-unit per index (10.3px ≈ 58px pitch x tan(10.1deg) at the
+   1366x768 baseline, so the left paint edges land on one straight 10.1deg
+   line parallel to the column slant). The outer content inset shrinks by the
+   same maxShift (basePl x fluid unit minus maxShift) and the header takes
    marginLeft maxShift, so the TOP row stays aligned under the header while
    lower rows track the receding left edge — all boxes keep non-negative
-   margins (never clipped by the scroll container's overflow-x-hidden) and
-   the 300px rows stay inside the shell at every scroll position. Stepping
-   caps at STEPPED_ROWS_CAP units so huge preset lists cannot push content
-   outside the shell; scroll compensation (row stack glides right along the
-   slant as it scrolls) keeps the alignment exact below the fold too. */
-const ROW_STEP_PX = 10.3;
-const STEPPED_ROWS_CAP = 8;
-const BASE_CONTENT_PL = 112;
-function columnStepPlan(unitCount: number): { outerPl: number; headerMl: number; offsetFor: (index: number) => number } {
+   margins (never clipped by the scroll container's overflow-x-hidden).
+   Stepping covers every shipped category (max 10 mod rows + key section)
+   so bottom rows never clamp to one margin and break colinearity; scroll
+   compensation (row stack glides right along the slant as it scrolls) keeps
+   the alignment exact top/mid/bottom (see SlantedScrollList).
+   Width budget (u = 1, all terms scale with rmU so it holds at any size):
+   a row that is exactly under the header has right edge maxShift + rowW and
+   must stay inside the scroller (colW - outerPl - padR - railMargin), which
+   simplifies to rowW <= colW - basePl - padR - railMargin. Categories:
+   320 <= 460 - 112 - 8 - 16 = 324. Presets (own tighter base inset):
+   140 <= 230 - 88 = 142. */
+const ROW_STEP_REF_PX = 10.3;
+const STEPPED_ROWS_CAP = 12;
+const BASE_CONTENT_PL_REF = 112;
+/** Tighter slant inset for the 3-slot Personal Presets column (less left padding). */
+export const PRESET_BASE_PL_REF = 88;
+/** Content right breathing room beside rows (design px at u = 1). */
+export const MOD_CONTENT_PR_REF = 8;
+/** Rail zone the scroller reserves on the right (design px at u = 1). */
+export const MOD_RAIL_MARGIN_REF = 16;
+/** Mod row width (design px at u = 1; mirrors .mod-row-card max-width). */
+export const MOD_ROW_W_REF = 320;
+/** Preset slot width (design px at u = 1; mirrors .mod-row-preset max-width). */
+export const PRESET_ROW_W_REF = 140;
+/* Key-grid row pitch at u = 1: K buttons render 32px tall (py-1.5 + 12px
+   mono line) with a 6px grid gap, so each pair-row advances 38px down the
+   column. Stepping each pair left by pitch x tan(10.1deg) keeps the K
+   buttons' left edges on the same 10.1deg slant line as the mod rows above
+   (same convention as ROW_STEP_REF_PX: the step scales with rmU while the
+   fixed-px pitch does not, so the shared angle is exact at the u = 1
+   baseline and the grid stays consistent with the mod rows elsewhere). */
+export const KEY_GRID_PITCH_REF_PX = 38;
+export const KEY_ROW_STEP_REF_PX = KEY_GRID_PITCH_REF_PX * MOD_SLANT_TAN;
+export function columnStepPlan(unitCount: number, rmU = 1, basePlRef = BASE_CONTENT_PL_REF): { outerPl: number; headerMl: number; offsetFor: (index: number) => number } {
+  const u = Number.isFinite(rmU) && rmU > 0 ? rmU : 1;
+  const step = ROW_STEP_REF_PX * u;
+  const basePl = basePlRef * u;
   const n = Math.max(1, Math.min(unitCount, STEPPED_ROWS_CAP));
-  const maxShift = (n - 1) * ROW_STEP_PX;
+  const maxShift = (n - 1) * step;
+  const outerPl = Math.max(0, basePl - maxShift);
+  const headerMl = basePl - outerPl;
   return {
-    outerPl: BASE_CONTENT_PL - maxShift,
-    headerMl: maxShift,
-    offsetFor: (index: number) => Math.max(0, maxShift - index * ROW_STEP_PX),
+    outerPl,
+    headerMl,
+    offsetFor: (index: number) => Math.max(0, maxShift - index * step),
   };
 }
 
-/** Painted width of the custom slanted scrollbar strip. */
-const SCROLLBAR_W = 8;
+/** Painted width of the custom slanted scrollbar strip (design px at u = 1). */
+const SCROLLBAR_REF_W = 8;
 
 /* Custom slanted scrollbar list: the native bar is hidden (see
    .lazer-column-scroll CSS) and replaced with a thin parallelogram rail +
@@ -923,32 +1026,57 @@ const SCROLLBAR_W = 8;
    tan(10.1deg) — exactly the slant direction — so rows glide along the
    slanted line and keep their left-edge alignment at any scroll position
    instead of drifting off it. */
-const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
+const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode; rmU?: number }> = ({ label, children, rmU = 1 }) => {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const thumbRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; startTop: number } | null>(null);
-  /* Applied compensation mirror (fresh for listeners); capped below. */
-  const appliedRef = useRef(0);
+  /* Fluid-unit mirror so the scroll listener (subscribed once) always uses
+     the live unit without re-subscribing on every resize. */
+  const rmURef = useRef(rmU);
   const [metrics, setMetrics] = useState({ trackH: 0, scrollH: 0, clientH: 0, scrollTop: 0, cap: 0 });
 
-  const sync = () => {
+  const sync = useCallback(() => {
     const sc = scrollerRef.current;
     const tr = trackRef.current;
-    if (!sc || !tr) return;
-    /* Widest row footprint with the current compensation backed out, so the
-       cap below is translate-invariant and cannot feedback-loop. */
-    let maxFoot = 0;
-    const wrap = sc.firstElementChild as HTMLElement | null;
-    if (wrap) {
-      const lr = sc.getBoundingClientRect().left;
-      const applied = appliedRef.current;
-      const kids = wrap.children;
+    const wrap = wrapRef.current;
+    if (!sc || !tr || !wrap) return;
+    /* Widest row footprint from LAYOUT boxes (offsetLeft/offsetWidth), which
+       ignore the glide translateX paint transform — so the cap below is
+       translate-invariant by construction and cannot feedback-loop. (The old
+       getBoundingClientRect version had to back out the previous glide via a
+       ref mirror; the mirror went stale mid-render and oscillated cap ->
+       glide -> rects until React hit maximum update depth and blanked the
+       page when Conversion scrolled to the bottom.)
+       Crucially the cap only considers rows VISIBLE in the viewport right
+       now. A global max would be set by the (scrolled-away) top row and bind
+       the glide for the whole travel, so mid/bottom content would sit left
+       of the slant line; visible rows have the most headroom exactly when
+       the glide needs it, keeping the current-top row under the header at
+       every scroll position. With exact glide each row's right edge lands at
+       maxShift + rowW when it reaches the top, inside the scroller by the
+       width-budget invariant above — so full compensation never clips. */
+    const scRect = sc.getBoundingClientRect();
+    let maxFoot = -1;
+    const kids = wrap.children;
+    for (let i = 0; i < kids.length; i++) {
+      const kid = kids[i] as HTMLElement;
+      if (kid.offsetWidth === 0 && kid.offsetHeight === 0) continue;
+      // Rects are paint-space (glide-shifted): used ONLY for the visibility
+      // test, never for the footprint, so the cap stays translate-invariant.
+      const r = kid.getBoundingClientRect();
+      if (r.bottom <= scRect.top + 1 || r.top >= scRect.bottom - 1) continue;
+      maxFoot = Math.max(maxFoot, kid.offsetLeft + kid.offsetWidth);
+    }
+    if (maxFoot < 0) {
       for (let i = 0; i < kids.length; i++) {
-        const r = (kids[i] as HTMLElement).getBoundingClientRect();
-        if (r.width === 0 && r.height === 0) continue;
-        maxFoot = Math.max(maxFoot, r.right - applied - lr);
+        const kid = kids[i] as HTMLElement;
+        if (kid.offsetWidth === 0 && kid.offsetHeight === 0) continue;
+        maxFoot = Math.max(maxFoot, kid.offsetLeft + kid.offsetWidth);
       }
     }
+    if (maxFoot < 0) maxFoot = 0;
     const next = {
       trackH: tr.clientHeight,
       scrollH: sc.scrollHeight,
@@ -956,42 +1084,80 @@ const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode }> 
       scrollTop: sc.scrollTop,
       cap: Math.max(0, sc.clientWidth - maxFoot),
     };
-    setMetrics(prev =>
-      prev.trackH === next.trackH && prev.scrollH === next.scrollH && prev.clientH === next.clientH && prev.scrollTop === next.scrollTop && prev.cap === next.cap
+    /* Rigid tracking: paint the glide + thumb position SYNCHRONOUSLY in the
+       scroll handler via refs. The state update below re-renders with the
+       same values a frame later (convergence, no fight); without the direct
+       write the native scroll paints first and the compensation trails a
+       frame behind, so buttons visibly swim diagonally — the "deformation"
+       during scrolling. Direct writes never feed back into measurement:
+       footprints use layout boxes, which ignore paint transforms. */
+    const u = Number.isFinite(rmURef.current) && rmURef.current > 0 ? rmURef.current : 1;
+    const glideNow = Math.min(next.scrollTop * SLANT_TAN, next.cap);
+    wrap.style.transform = `translateX(${glideNow.toFixed(2)}px)`;
+    const thumbEl = thumbRef.current;
+    if (thumbEl) {
+      const tH = next.trackH;
+      const tMinH = 28 * u;
+      const tRange = next.scrollH - next.clientH;
+      const scrollableNow = tRange > 1;
+      if (scrollableNow && tH > 0) {
+        const thH = Math.min(tH, Math.max(tMinH, (next.clientH / next.scrollH) * tH));
+        const thMaxTop = Math.max(0, tH - thH);
+        const thTop = thMaxTop > 0 ? Math.min(thMaxTop, Math.max(0, (next.scrollTop / tRange) * thMaxTop)) : 0;
+        thumbEl.style.top = `${thTop.toFixed(1)}px`;
+        thumbEl.style.right = `${(thTop * SLANT_TAN).toFixed(1)}px`;
+      } else {
+        thumbEl.style.top = '0px';
+        thumbEl.style.right = '0px';
+      }
+    }
+    setMetrics(prev => {
+      const close = (a: number, b: number) => Math.abs(a - b) < 0.5;
+      return close(prev.trackH, next.trackH) && close(prev.scrollH, next.scrollH) && close(prev.clientH, next.clientH) && close(prev.scrollTop, next.scrollTop) && close(prev.cap, next.cap)
         ? prev
-        : next,
-    );
-  };
+        : next;
+    });
+  }, []);
 
+  /* Mount + fluid-unit settle only. Deliberately NOT on every render: sync ->
+     setMetrics -> render -> sync is the loop that blanked Conversion. Content
+     changes (search filter, row count) arrive via the wrap ResizeObserver
+     below; scrolling arrives via the scroll listener. */
   useLayoutEffect(() => {
     sync();
-  });
+  }, [sync, rmU]);
 
   useEffect(() => {
     const sc = scrollerRef.current;
     const tr = trackRef.current;
-    if (!sc || !tr) return;
+    const wrap = wrapRef.current;
+    if (!sc || !tr || !wrap) return;
+    sync();
     const ro = new ResizeObserver(() => sync());
     ro.observe(sc);
     ro.observe(tr);
+    ro.observe(wrap);
     sc.addEventListener('scroll', sync, { passive: true });
     return () => {
       ro.disconnect();
       sc.removeEventListener('scroll', sync);
     };
-  }, []);
+  }, [sync]);
 
   const scrollable = metrics.scrollH > metrics.clientH + 1;
-  /* Glide along the slant, capped so the widest row never clips: containment
-     wins over alignment once the container wall is reached. */
+  /* Glide along the slant, capped by the VISIBLE rows' headroom so nothing
+     paints past the scroller wall; because the cap tracks the viewport (not
+     the scrolled-away top row) the current-top row lands back under the
+     header at top, mid and bottom scroll alike. Rendered from state for
+     convergence; the live value is written synchronously in sync(). */
   const glide = Math.min(metrics.scrollTop * SLANT_TAN, metrics.cap);
-  useLayoutEffect(() => {
-    appliedRef.current = glide;
-  });
+  rmURef.current = rmU;
   const trackH = metrics.trackH;
+  const scrollbarW = SCROLLBAR_REF_W * (Number.isFinite(rmU) && rmU > 0 ? rmU : 1);
+  const thumbMinH = 28 * (Number.isFinite(rmU) && rmU > 0 ? rmU : 1);
   const thumbH = !scrollable
     ? trackH
-    : Math.min(trackH, Math.max(28, (metrics.clientH / metrics.scrollH) * trackH));
+    : Math.min(trackH, Math.max(thumbMinH, (metrics.clientH / metrics.scrollH) * trackH));
   const maxTop = Math.max(0, trackH - thumbH);
   const range = metrics.scrollH - metrics.clientH;
   const thumbTop = scrollable && range > 0 && maxTop > 0
@@ -1038,28 +1204,31 @@ const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode }> 
         role="region"
         aria-label={label}
         tabIndex={0}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-3 mr-[16px] flex flex-col gap-2 lazer-column-scroll outline-none focus-visible:ring-1 focus-visible:ring-white/30 rounded"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-3 flex flex-col gap-2 lazer-column-scroll outline-none focus-visible:ring-1 focus-visible:ring-white/30 rounded"
+        style={{ marginRight: 'calc(16px * var(--rm-u, 1))' }}
       >
         <div
-          className="flex min-h-0 flex-col gap-2"
+          ref={wrapRef}
+          className="relative flex min-h-0 flex-col gap-2"
           style={{ transform: `translateX(${glide.toFixed(2)}px)` }}
         >
           {children}
         </div>
       </div>
-      <div ref={trackRef} aria-hidden className="absolute top-[12px] bottom-[12px] right-[16px] w-[150px] pointer-events-none">
+      <div ref={trackRef} aria-hidden className="absolute top-[12px] bottom-[12px] w-[150px] pointer-events-none" style={{ right: 'calc(16px * var(--rm-u, 1))' }}>
         {trackH > 0 && (
           <div
             className="absolute inset-0 pointer-events-auto cursor-pointer"
             onPointerDown={onTrackPointerDown}
             style={{
-              clipPath: `polygon(calc(100% - ${SCROLLBAR_W}px) 0px, 100% 0px, calc(100% - ${trackRun.toFixed(1)}px) 100%, calc(100% - ${(trackRun + SCROLLBAR_W).toFixed(1)}px) 100%)`,
+              clipPath: `polygon(calc(100% - ${scrollbarW}px) 0px, 100% 0px, calc(100% - ${trackRun.toFixed(1)}px) 100%, calc(100% - ${(trackRun + scrollbarW).toFixed(1)}px) 100%)`,
               backgroundColor: 'rgba(255,255,255,0.14)',
             }}
           />
         )}
         {scrollable && thumbH > 0 && (
           <div
+            ref={thumbRef}
             className="absolute pointer-events-auto cursor-grab active:cursor-grabbing hover:brightness-150"
             onPointerDown={onThumbPointerDown}
             onPointerMove={onThumbPointerMove}
@@ -1069,7 +1238,7 @@ const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode }> 
               top: thumbTop,
               height: thumbH,
               right: thumbTop * SLANT_TAN,
-              width: SCROLLBAR_W + thumbRun,
+              width: scrollbarW + thumbRun,
               clipPath: `polygon(${thumbRun.toFixed(1)}px 0px, 100% 0px, calc(100% - ${thumbRun.toFixed(1)}px) 100%, 0px 100%)`,
               backgroundColor: 'rgba(255,255,255,0.55)',
             }}
@@ -1086,18 +1255,23 @@ const SlantedScrollList: React.FC<{ label: string; children: React.ReactNode }> 
 const ROW_CLIP_SM =
   'polygon(7.8px 0.0px, calc(100% - 3.6px) 0.0px, calc(100% - 2.6px) 0.2px, calc(100% - 1.6px) 0.7px, calc(100% - 1.0px) 1.5px, calc(100% - 0.6px) 2.5px, calc(100% - 0.6px) 3.5px, calc(100% - 4.9px) calc(100% - 2.5px), calc(100% - 5.1px) calc(100% - 1.7px), calc(100% - 5.6px) calc(100% - 1.0px), calc(100% - 6.2px) calc(100% - 0.5px), calc(100% - 7.0px) calc(100% - 0.1px), calc(100% - 7.8px) 100%, 3.6px 100%, 2.6px calc(100% - 0.2px), 1.6px calc(100% - 0.7px), 1.0px calc(100% - 1.5px), 0.6px calc(100% - 2.5px), 0.6px calc(100% - 3.5px), 4.9px 2.5px, 5.1px 1.7px, 5.6px 1.0px, 6.2px 0.5px, 7.0px 0.1px, 7.8px 0.0px)';
 
-function loadPresets(): ModPreset[] {
+function loadPresetSlots(): (ModPreset | null)[] {
+  const fallback: (ModPreset | null)[] = [null, null, null];
   try {
     const raw = localStorage.getItem(PRESETS_KEY);
-    if (!raw) return [];
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
+    if (!Array.isArray(parsed)) return fallback;
+    // Legacy shape: ModPreset[] (up to 20). Current shape: (ModPreset|null)[3].
+    const cleaned = parsed
       .filter((p): p is ModPreset => typeof p === 'object' && p !== null && typeof (p as ModPreset).name === 'string' && Array.isArray((p as ModPreset).mods))
-      .slice(0, 20)
+      .slice(0, PRESET_SLOT_COUNT)
       .map(p => ({ name: p.name.slice(0, 32), mods: sanitizeGameplayMods(p.mods.filter(m => typeof m === 'string')).slice(0, 24) }));
+    const slots: (ModPreset | null)[] = [null, null, null];
+    for (let i = 0; i < PRESET_SLOT_COUNT; i++) slots[i] = cleaned[i] ?? null;
+    return slots;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
@@ -1115,7 +1289,7 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [customiseOpen, setCustomiseOpen] = useState(false);
-  const [presets, setPresets] = useState<ModPreset[]>(() => loadPresets());
+  const [presetSlots, setPresetSlots] = useState<(ModPreset | null)[]>(() => loadPresetSlots());
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1172,19 +1346,29 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
     }
   };
 
-  const persistPresets = (next: ModPreset[]) => {
-    setPresets(next);
+  const persistPresetSlots = (next: (ModPreset | null)[]) => {
+    const fixed: (ModPreset | null)[] = [next[0] ?? null, next[1] ?? null, next[2] ?? null];
+    setPresetSlots(fixed);
     try {
-      localStorage.setItem(PRESETS_KEY, JSON.stringify(next));
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(fixed));
     } catch {
       // storage may be unavailable; presets stay in memory only
     }
   };
 
-  const handleSavePreset = () => {
+  const handleSavePresetSlot = (index: number) => {
     if (selectedMods.length === 0) return;
-    const next: ModPreset[] = [...presets, { name: `Preset ${presets.length + 1}`, mods: [...selectedMods] }].slice(-20);
-    persistPresets(next);
+    if (index < 0 || index >= PRESET_SLOT_COUNT) return;
+    const next = [...presetSlots];
+    next[index] = { name: `Preset ${index + 1}`, mods: [...selectedMods] };
+    persistPresetSlots(next);
+  };
+
+  const handleClearPresetSlot = (index: number) => {
+    if (index < 0 || index >= PRESET_SLOT_COUNT) return;
+    const next = [...presetSlots];
+    next[index] = null;
+    persistPresetSlots(next);
   };
 
   // Filter mods by query (lazer search filters rows inside each column)
@@ -1206,11 +1390,11 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
   const hp = beatmapStats?.hp;
   const firstActiveMod = selectedMods.length > 0 ? ALL_MODS.find(m => m.id === selectedMods[0]) : undefined;
   const FirstActiveIcon = firstActiveMod?.icon;
-  const presetStep = columnStepPlan(1 + presets.length);
-  const presetPlusClip = useDynamicSlantClip(4, 50, ROW_CLIP);
+  const rmU = useModRmUnit();
+  const presetStep = columnStepPlan(PRESET_SLOT_COUNT, rmU, PRESET_BASE_PL_REF);
   const presetItemClip = useDynamicSlantClip(4, 50, ROW_CLIP);
   const colRO = useRef<ResizeObserver | null>(null);
-  const [colH, setColH] = useState(630);
+  const [colH, setColH] = useState(MOD_COL_H_REF);
   /* Measured via ref callback (not a mount effect): the callback provably
      fires when the section commits, while a parent layout effect can observe
      an empty tree on this mount path (AnimatePresence enter + StrictMode).
@@ -1229,9 +1413,15 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
     colRO.current = ro;
   }, []);
   const columnClip = useMemo(
-    () => (Math.abs(colH - 630) < 0.5 ? COLUMN_CLIP : buildSlantClip(colH * SLANT_TAN, colH, 10)),
-    [colH],
+    () => (Math.abs(colH - 630) < 0.5 ? COLUMN_CLIP : buildSlantClip(colH * SLANT_TAN, colH, MOD_COLUMN_R * rmU)),
+    [colH, rmU],
   );
+  /* Rectangular box overlap between adjacent shells. Negative = overlap.
+     Derived live from the measured column height so the SLANTED-perpendicular
+     daylight stays MOD_GAP_REF_PERP_PX * rmU: at the 1366x768 baseline
+     (colH = 521, rmU = 1) this is exactly -70px; at 1600x900 it deepens to
+     ≈-90px instead of holding -70px and letting the daylight balloon. */
+  const colOverlapPx = useMemo(() => modColumnRectGap(colH, rmU), [colH, rmU]);
 
   return (
     <AnimatePresence>
@@ -1239,6 +1429,8 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
         <motion.div
           key="mod-select-lazer"
           data-colh={colH}
+          data-rmu={rmU.toFixed(4)}
+          data-coloverlap={colOverlapPx.toFixed(1)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -1401,65 +1593,92 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
                 h-full (not min-h-full) so tall columns scroll instead of growing
                 and getting clipped by the outer overflow-y-hidden. */}
             <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden lazer-columns-scroll">
-              {/* Columns overlap with a -70px rectangular gap (70px overlap) between each shell (see COLUMN_CLIP). */}
+              {/* Columns overlap so the SLANTED-perpendicular daylight stays constant
+                  (MOD_GAP_REF_PERP_PX * rmU): the rectangular box offset is derived
+                  live from the measured column height (colOverlapPx, negative =
+                  overlap). At the 1366x768 baseline this is exactly -70px. */}
               <div className="flex gap-0 px-2 sm:px-6 lg:px-10 py-4 items-stretch h-full w-max min-w-full">
-                {/* Personal Presets column */}
-                <section aria-label="Personal Presets" ref={measureSectionRef} className="relative w-[230px] lg:w-[240px] shrink-0 h-full min-h-0 flex flex-col">
+                {/* Personal Presets column: fixed 3-slot mod configs, never
+                    vertically scrollable. Each slot stores one mod combo
+                    locally (same PRESETS_KEY, first 3 legacy entries
+                    migrate into slots 1-3). Empty slot + saves the current
+                    selection; filled slot click applies it, Save overwrites
+                    it with the current selection, X clears it. */}
+                <section aria-label="Personal Presets" ref={measureSectionRef} className="relative mod-col-preset shrink-0 h-full min-h-0 flex flex-col z-10">
                   <div
                     aria-hidden
                     className="absolute inset-0 overflow-hidden pointer-events-none"
                     style={{ clipPath: columnClip, backgroundColor: '#2c3a2d' }}
                   >
-                    <div className="h-[40px] w-full" style={{ backgroundColor: PRESET_COLUMN_COLOR }} />
+                    <div className="w-full" style={{ backgroundColor: PRESET_COLUMN_COLOR, height: 40 * rmU }} />
                   </div>
-                  <div className="relative flex-1 min-h-0 h-full flex flex-col pl-[112px] pr-[16px]" style={{ paddingLeft: presetStep.outerPl }}>
-                    <header className="flex-none h-[40px] flex items-center text-[13px] font-bold truncate" style={{ color: '#141a10', marginLeft: presetStep.headerMl }}>
+                  <div className="relative flex-1 min-h-0 h-full flex flex-col" style={{ paddingLeft: presetStep.outerPl, paddingRight: MOD_CONTENT_PR_REF * rmU }}>
+                    <header className="flex-none flex items-center text-[13px] font-bold truncate" style={{ color: '#141a10', marginLeft: presetStep.headerMl, height: 40 * rmU }}>
                       Personal Presets
                     </header>
-                    <SlantedScrollList label="Personal presets list">
-                      <button
-                        type="button"
-                        onClick={handleSavePreset}
-                        disabled={selectedMods.length === 0}
-                        title={selectedMods.length === 0 ? 'Select mods first, then save them as a preset' : 'Save current mods as a preset'}
-                        className="w-full max-w-[80px] bg-black/25 border border-white/10 hover:border-white/25 hover:bg-black/35 transition py-4 grid place-items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ clipPath: presetPlusClip.clip, marginLeft: presetStep.offsetFor(0) }}
-                        ref={presetPlusClip.setRef}
-                      >
-                        <Plus className="w-5 h-5 text-white/80" />
-                      </button>
-                      {presets.length === 0 && (
-                        <p className="text-[11px] text-white/40 leading-snug text-center mt-1">
-                          Save your current mod combo for one-tap reuse.
-                        </p>
-                      )}
-                      {presets.map((preset, idx) => (
-                        <div key={`${preset.name}-${idx}`} className="group/preset relative w-full max-w-[80px]" style={{ marginLeft: presetStep.offsetFor(idx + 1) }}>
-                          <button
-                            type="button"
-                            ref={presetItemClip.setRef}
-                            onClick={() => onUpdateMods(sanitizeGameplayMods(preset.mods))}
-                            title={`Apply ${preset.name}: ${preset.mods.join(', ') || 'no mods'}`}
-                            className="w-full bg-[#42523f]/80 hover:bg-[#4b5f46] border border-white/[0.06] pl-2 pr-8 py-2 text-left transition cursor-pointer"
-                            style={{ clipPath: presetItemClip.clip }}
-                          >
-                            <span className="block text-[13px] font-bold text-white truncate">{preset.name}</span>
-                            <span className="block text-[11px] text-white/55 truncate font-mono">
-                              {preset.mods.length > 0 ? preset.mods.join(' + ') : 'No mods'}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => persistPresets(presets.filter((_, i) => i !== idx))}
-                            title={`Delete ${preset.name}`}
-                            aria-label={`Delete ${preset.name}`}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md hidden group-hover/preset:grid place-items-center bg-black/40 hover:bg-rose-500/70 text-white/70 hover:text-white transition cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+                    <div role="group" aria-label="Personal presets list" className="flex-none flex flex-col gap-2 py-3 outline-none">
+                      {presetSlots.map((slot, idx) => (
+                        <div key={`preset-slot-${idx}`} className="group/preset relative w-full mod-row-preset" style={{ marginLeft: presetStep.offsetFor(idx) }}>
+                          {slot === null ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSavePresetSlot(idx)}
+                              disabled={selectedMods.length === 0}
+                              title={selectedMods.length === 0 ? `Slot ${idx + 1}: select mods first, then save them here` : `Save current mods as Preset ${idx + 1}`}
+                              aria-label={`Save current mods as Preset ${idx + 1}`}
+                              className="w-full bg-black/25 border border-dashed border-white/15 hover:border-white/30 hover:bg-black/35 transition py-3 px-2 grid place-items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              style={{ clipPath: presetItemClip.clip }}
+                              ref={idx === 0 ? presetItemClip.setRef : undefined}
+                            >
+                              <span className="flex items-center gap-2 text-white/70">
+                                <Plus className="w-4 h-4" />
+                                <span className="text-[12px] font-bold">Preset {idx + 1}</span>
+                              </span>
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onUpdateMods(sanitizeGameplayMods(slot.mods))}
+                                title={`Apply ${slot.name}: ${slot.mods.join(', ') || 'no mods'}`}
+                                aria-label={`Apply ${slot.name}`}
+                                className="w-full bg-[#42523f]/80 hover:bg-[#4b5f46] border border-white/[0.06] pl-2 pr-14 py-2 text-left transition cursor-pointer"
+                                style={{ clipPath: presetItemClip.clip }}
+                              >
+                                <span className="block text-[13px] font-bold text-white truncate">{slot.name}</span>
+                                <span className="block text-[11px] text-white/55 truncate font-mono">
+                                  {slot.mods.length > 0 ? slot.mods.join(' + ') : 'No mods'}
+                                </span>
+                              </button>
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSavePresetSlot(idx)}
+                                  disabled={selectedMods.length === 0}
+                                  title={selectedMods.length === 0 ? 'Select mods first, then overwrite this preset' : `Overwrite ${slot.name} with current mods`}
+                                  aria-label={`Overwrite ${slot.name} with current mods`}
+                                  className="h-6 w-6 rounded-md grid place-items-center bg-black/40 hover:bg-white/20 text-white/70 hover:text-white transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <Save className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearPresetSlot(idx)}
+                                  title={`Delete ${slot.name}`}
+                                  aria-label={`Delete ${slot.name}`}
+                                  className="h-6 w-6 rounded-md grid place-items-center bg-black/40 hover:bg-rose-500/70 text-white/70 hover:text-white transition cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            </>
+                          )}
                         </div>
                       ))}
-                    </SlantedScrollList>
+                      <p className="text-[11px] text-white/40 leading-snug text-center mt-1">
+                        Tap a slot to apply it. Save the current combo into an empty slot.
+                      </p>
+                    </div>
                   </div>
                 </section>
 
@@ -1468,21 +1687,21 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
                   const showKeySection =
                     cat.id === 'conversion' && (!query || 'key conversion 1k 2k 3k 4k 5k 6k 7k 8k 9k 10k keys'.includes(query));
                   if (catMods.length === 0 && !showKeySection) return null;
-                  const step = columnStepPlan(catMods.length + (showKeySection ? 1 : 0));
+                  const step = columnStepPlan(catMods.length + (showKeySection ? 1 : 0), rmU);
                   return (
-                    <section key={cat.id} aria-label={cat.name} className="relative w-[460px] lg:w-[480px] -ml-[70px] shrink-0 h-full min-h-0 flex flex-col">
+                    <section key={cat.id} aria-label={cat.name} className="relative mod-col-cat shrink-0 h-full min-h-0 flex flex-col" style={{ marginLeft: colOverlapPx }}>
                       <div
                         aria-hidden
                         className="absolute inset-0 overflow-hidden pointer-events-none"
                         style={{ clipPath: columnClip, backgroundColor: '#2c3a2d' }}
                       >
-                        <div className="h-[40px] w-full" style={{ backgroundColor: cat.color }} />
+                        <div className="w-full" style={{ backgroundColor: cat.color, height: 40 * rmU }} />
                       </div>
-                      <div className="relative flex-1 min-h-0 h-full flex flex-col pl-[112px] pr-[16px]" style={{ paddingLeft: step.outerPl }}>
-                        <header className="flex-none h-[40px] flex items-center text-[13px] font-bold truncate" style={{ color: '#141a10', marginLeft: step.headerMl }}>
+                      <div className="relative flex-1 min-h-0 h-full flex flex-col" style={{ paddingLeft: step.outerPl, paddingRight: MOD_CONTENT_PR_REF * rmU }}>
+                        <header className="flex-none flex items-center text-[13px] font-bold truncate" style={{ color: '#141a10', marginLeft: step.headerMl, height: 40 * rmU }}>
                           {cat.name}
                         </header>
-                        <SlantedScrollList label={`${cat.name} mods list`}>
+                        <SlantedScrollList label={`${cat.name} mods list`} rmU={rmU}>
                           {catMods.map((mod, modIdx) => (
                             <LazerModCard
                               key={mod.id}
@@ -1496,20 +1715,34 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
                           ))}
 
                           {cat.id === 'conversion' && showKeySection && (
-                            <div className="mt-1 pt-2 border-t border-white/10 mr-[20px]" style={{ marginLeft: step.offsetFor(catMods.length) }}>
+                            /* Same width budget as a mod row (MOD_ROW_W_REF): the block's
+                               left edge steps with the slant line like every other unit,
+                               and at full scroll-glide its right edge lands at
+                               maxShift + rowW — inside the scroller, so the 1K-10K
+                               grid is never clipped and never juts past the rows.
+                               Each K pair-row steps left by KEY_ROW_STEP further, so
+                               the K buttons' own left edges continue down the same
+                               10.1deg slant instead of forming a vertical stack. The
+                               deepest pair shifts 4 steps (27.2px at u = 1), inside
+                               the outerPl breathing room, so nothing clips left. */
+                            <div className="mt-1 pt-2 border-t border-white/10" style={{ marginLeft: step.offsetFor(catMods.length), marginRight: 20 * rmU, maxWidth: MOD_ROW_W_REF * rmU }}>
                               <p className="text-[10px] uppercase tracking-wider text-white/45 font-bold mb-1.5 px-0.5">
                                 Key Conversion
                               </p>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(k => (
-                                  <KeyGridButton
-                                    key={`K${k}`}
-                                    k={k}
-                                    isActive={selectedMods.includes(`K${k}`)}
-                                    isNative={availableKeyCounts.includes(k)}
-                                    catColor={cat.color}
-                                    onToggle={handleToggleKeyMod}
-                                  />
+                              <div className="flex flex-col" style={{ gap: 6 }}>
+                                {[0, 1, 2, 3, 4].map(pair => (
+                                  <div key={`Kpair${pair}`} className="grid grid-cols-2" style={{ gap: 6, width: MOD_ROW_W_REF * rmU, maxWidth: '100%', marginLeft: -pair * KEY_ROW_STEP_REF_PX * rmU }}>
+                                    {[2 * pair + 1, 2 * pair + 2].map(k => (
+                                      <KeyGridButton
+                                        key={`K${k}`}
+                                        k={k}
+                                        isActive={selectedMods.includes(`K${k}`)}
+                                        isNative={availableKeyCounts.includes(k)}
+                                        catColor={cat.color}
+                                        onToggle={handleToggleKeyMod}
+                                      />
+                                    ))}
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -1522,20 +1755,24 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
               </div>
             </div>
 
-            {/* Bottom action bar */}
-            <footer className="flex-none bg-[#20261f]/95 border-t border-white/10 px-2 sm:px-6 lg:px-10 pt-4 pb-3 flex items-center gap-3">
+            {/* Bottom action bar. Left cluster mirrors the Song Select footer
+                metrics (12px pad + 220px Back + 32px gap; 8/104/16 on
+                <=768px) so the green Mods parallelogram sits in the exact
+                same slot as the Song Select Mods slab. */}
+            <footer className="flex-none bg-[#20261f]/95 border-t border-white/10 pl-3 max-[768px]:pl-2 pr-2 sm:pr-6 lg:pr-10 pt-4 pb-3 flex items-center gap-3">
+              <div className="flex items-center gap-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="-skew-x-[12deg] rounded-lg bg-[#f23a9c] hover:brightness-110 active:scale-95 transition px-6 sm:px-8 py-2.5 cursor-pointer"
+                className="-skew-x-[12deg] rounded-lg bg-[#f23a9c] hover:brightness-110 active:scale-95 transition px-6 sm:px-8 max-[768px]:px-4 py-2.5 cursor-pointer min-w-[220px] max-[768px]:min-w-[104px]"
               >
-                <span className="skew-x-[12deg] flex items-center gap-2 text-[13px] font-bold text-white">
+                <span className="skew-x-[12deg] flex items-center justify-center gap-2 text-[13px] font-bold text-white">
                   <ChevronLeft className="w-4 h-4" />
                   Back
                 </span>
               </button>
 
-              <div className="relative">
+              <div className="relative ml-8 max-[768px]:ml-4">
                 {(selectedMods.length > 0 || isUnranked) && (
                   <span className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1 whitespace-nowrap">
                     {firstActiveMod && FirstActiveIcon && (
@@ -1562,6 +1799,7 @@ export const ModSelectOverlay: React.FC<ModSelectOverlayProps> = ({
                     <span className="text-[11px] font-bold mt-0.5">Mods{selectedMods.length > 0 ? ` (${selectedMods.length})` : ''}</span>
                   </span>
                 </div>
+              </div>
               </div>
 
               <button

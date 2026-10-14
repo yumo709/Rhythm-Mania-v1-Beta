@@ -18,6 +18,7 @@
  */
 
 import { CATBOY_DOWNLOAD_ENDPOINT, NEKOHA_DOWNLOAD_ENDPOINT } from '../../api/_lib/mirrorCatalog';
+import { readBoundedResponse } from './boundedResponse';
 
 type MirrorRequestKind = 'api' | 'download';
 
@@ -28,58 +29,18 @@ const lastRequestAt: Record<MirrorRequestKind, number> = {
 
 const API_MIN_INTERVAL_MS = 1000;
 const DOWNLOAD_MIN_INTERVAL_MS = 6000;
+const DOWNLOAD_TIMEOUT_MS = 120_000;
 
 export async function waitForOsuSlot(kind: MirrorRequestKind): Promise<void> {
   const minInterval = kind === 'download' ? DOWNLOAD_MIN_INTERVAL_MS : API_MIN_INTERVAL_MS;
   const now = Date.now();
-  const waitMs = Math.max(0, lastRequestAt[kind] + minInterval - now);
+  // Reserve before waiting: concurrent callers must not all claim the same slot.
+  const reservedAt = Math.max(now, lastRequestAt[kind] + minInterval);
+  lastRequestAt[kind] = reservedAt;
+  const waitMs = reservedAt - now;
   if (waitMs > 0) {
-    await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
-  lastRequestAt[kind] = Date.now();
-}
-
-async function streamToBlob(
-  response: Response,
-  maxBytes: number,
-  onProgress: (loaded: number, total: number) => void,
-): Promise<Blob> {
-  const contentLength = response.headers.get('content-length');
-  const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-  if (totalBytes > maxBytes) {
-    throw new Error(
-      `Security Exception: Download size exceeds limit (${(totalBytes / (1024 * 1024)).toFixed(1)} MB)`,
-    );
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('ReadableStream is unsupported in this browser.');
-
-  let loadedBytes = 0;
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    chunks.push(value);
-    loadedBytes += value.length;
-    if (loadedBytes > maxBytes) {
-      reader.cancel();
-      throw new Error(
-        `Security Exception: Download size limit exceeded (${(loadedBytes / (1024 * 1024)).toFixed(1)} MB)`,
-      );
-    }
-    onProgress(loadedBytes, totalBytes);
-  }
-
-  return new Blob(
-    chunks.map((chunk) => {
-      const copy = new Uint8Array(chunk.byteLength);
-      copy.set(chunk);
-      return copy.buffer;
-    }),
-    { type: 'application/octet-stream' },
-  );
 }
 
 export async function downloadBeatmapsetArchive(
@@ -88,16 +49,25 @@ export async function downloadBeatmapsetArchive(
   onProgress: (loaded: number, total: number) => void,
   maxBytes: number,
 ): Promise<Blob> {
+  if (!Number.isSafeInteger(sourceSetId) || sourceSetId < 1) {
+    throw new Error('Invalid beatmapset id.');
+  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new Error('Invalid download size limit.');
+  }
   await waitForOsuSlot('download');
   onStatus('Requesting download from Catboy mirror…');
 
   let catboyError = '';
   try {
-    const response = await fetch(`${CATBOY_DOWNLOAD_ENDPOINT}/${sourceSetId}`);
+    const response = await fetch(`${CATBOY_DOWNLOAD_ENDPOINT}/${sourceSetId}`, {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
     if (response.ok) {
-      return await streamToBlob(response, maxBytes, onProgress);
+      return await readBoundedResponse(response, maxBytes, onProgress);
     }
     catboyError = `Catboy mirror responded (${response.status})`;
+    await response.body?.cancel().catch(() => {});
   } catch (error) {
     catboyError = error instanceof Error ? error.message : 'Catboy mirror unreachable';
   }
@@ -105,17 +75,20 @@ export async function downloadBeatmapsetArchive(
   onStatus(`Catboy failed (${catboyError}). Trying Nekoha mirror…`);
   let nekohaResponse: Response;
   try {
-    nekohaResponse = await fetch(`${NEKOHA_DOWNLOAD_ENDPOINT}/${sourceSetId}`);
+    nekohaResponse = await fetch(`${NEKOHA_DOWNLOAD_ENDPOINT}/${sourceSetId}`, {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
   } catch (error) {
     throw new Error(`Download failed: ${catboyError}; Nekoha mirror unreachable`);
   }
+  if (!nekohaResponse.ok) await nekohaResponse.body?.cancel().catch(() => {});
   if (nekohaResponse.status === 410) {
     throw new Error('Download failed: beatmapset is unavailable on the mirrors (DMCA or missing audio)');
   }
   if (!nekohaResponse.ok) {
     throw new Error(`Download failed: Catboy (${catboyError}), Nekoha (${nekohaResponse.status})`);
   }
-  return streamToBlob(nekohaResponse, maxBytes, onProgress);
+  return readBoundedResponse(nekohaResponse, maxBytes, onProgress);
 }
 
 export async function searchOsuBeatmapSetId(title: string, artist: string): Promise<number | null> {

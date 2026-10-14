@@ -1,0 +1,4 @@
+install-baseline/
+browser/
+mcp-request.json
+pre-existing.patch

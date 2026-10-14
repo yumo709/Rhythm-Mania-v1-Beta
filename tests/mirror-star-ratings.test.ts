@@ -71,7 +71,7 @@ describe('fetchOfficialChartsForSet', () => {
         if (String(url).includes('/api/catalog/search')) {
           return { ok: true, status: 200, json: async () => ({ data: [{ sourceSetId: 999, charts: CHARTS }] }) };
         }
-        return { ok: true, status: 200, json: async () => [] };
+        return Response.json([]);
       }),
     );
     await expect(fetchOfficialChartsForSet(2153231, 'triangles', 'cYsmix')).resolves.toEqual([]);
@@ -82,10 +82,7 @@ describe('fetchOfficialChartsForSet', () => {
       'fetch',
       vi.fn(async (url: unknown) => {
         if (String(url).includes('/api/catalog/search')) throw new Error('no api in vite dev');
-        return {
-          ok: true,
-          status: 200,
-          json: async () => [
+        return Response.json([
             {
               SetID: 2153231,
               RankedStatus: 1,
@@ -97,8 +94,7 @@ describe('fetchOfficialChartsForSet', () => {
                 { BeatmapID: 4562874, DiffName: '[4K] easy', FileMD5: '99D85238E5DD0221CFC8068352A7B3F9', Mode: 0, CS: 4, DifficultyRating: 1.65833, BPM: 160 },
               ],
             },
-          ],
-        };
+          ]);
       }),
     );
     const charts = await fetchOfficialChartsForSet(2153231, 'triangles', 'cYsmix');

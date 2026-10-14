@@ -80,6 +80,37 @@ export const LAZER_MENU_OVERLAP_PX = 18;
 /** Visible gap between settings/back and play/solo; cookie parks in this slot. */
 export const LAZER_COOKIE_SLOT_PX = 128;
 
+/* Fluid proportional scaling: 1366x768 is the design baseline (u = 1).
+   Every inner size/type/padding/gap scales as N * u where
+   u = min(viewportW/1366, viewportH/768) on desktop. Compact (width <= 720)
+   keeps u = 1 with no shear (see DESIGN.md coordinates). The value is
+   mirrored to CSS as --rm-u (unitless number) by updateRmUnit(). */
+export const RM_BASE_W = 1366;
+export const RM_BASE_H = 768;
+export const RM_COMPACT_MAX_W = 720;
+
+export function rmUnitScale(viewportW: number, viewportH: number): number {
+  if (!Number.isFinite(viewportW) || !Number.isFinite(viewportH)) return 1;
+  if (viewportW <= 0 || viewportH <= 0) return 1;
+  if (viewportW <= RM_COMPACT_MAX_W) return 1;
+  const u = Math.min(viewportW / RM_BASE_W, viewportH / RM_BASE_H);
+  return Number.isFinite(u) && u > 0 ? u : 1;
+}
+
+/** Writes the live --rm-u scale onto root; returns it. No-op on the server. */
+export function updateRmUnit(root?: HTMLElement | null): number {
+  const fallback = 1;
+  try {
+    if (typeof window === 'undefined') return fallback;
+    const target = root ?? (typeof document !== 'undefined' ? document.documentElement : null);
+    const u = rmUnitScale(window.innerWidth, window.innerHeight);
+    target?.style.setProperty('--rm-u', String(u));
+    return u;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Horizontal offset (px) to park the cookie in the settings–play gap, shifted slightly left for optimal balance. */
 export function lazerCompactCookieX(): number {
   return -(LAZER_MENU_SETTINGS_WIDTH_PX - LAZER_MENU_OVERLAP_PX + LAZER_COOKIE_SLOT_PX / 2 + 24);
@@ -146,6 +177,7 @@ export function applyLazerChrome(settings: PlayfieldVisualSettings, root: HTMLEl
   const chrome = resolveLazerChrome(settings);
   root.dataset.skin = chrome.skin;
   root.dataset.ui = chrome.ui;
+  updateRmUnit(root);
 }
 
 export function useLazerReducedMotion(): boolean {

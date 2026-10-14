@@ -56,6 +56,11 @@ export {
 
   lazerCompactCookieX,
   LAZER_MENU_WEDGE,
+  RM_BASE_W,
+  RM_BASE_H,
+  RM_COMPACT_MAX_W,
+  rmUnitScale,
+  updateRmUnit,
   LAZER_OVERLAY_BG_ALPHA,
   LAZER_PINK,
   LAZER_PINK_LIGHT,

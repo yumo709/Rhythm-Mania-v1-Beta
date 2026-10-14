@@ -35,28 +35,13 @@ preloadMenuMusic();
 mainAudio.preloadSfx();
 
 // Register Service Worker for robust offline caching
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('[Service Worker] Registered successfully with scope:', reg.scope);
-        
-        // Listen for updates from the service worker installation lifecycle
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[Service Worker] New version detected! Preparing to upgrade...');
-              }
-            });
-          }
-        });
-      })
       .catch((err) => {
         console.warn('[Service Worker] Registration failed:', err);
       });
-  });
+  }, { once: true });
 
 }
 

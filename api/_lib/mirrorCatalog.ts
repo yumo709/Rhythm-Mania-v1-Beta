@@ -37,6 +37,8 @@
  *   Download: https://mirror.nekoha.moe/api/download/<SetID>.
  */
 
+import { readBoundedResponse } from '../../src/utils/boundedResponse.js';
+
 export interface MirrorChart {
   id: number;
   filename: string;
@@ -263,22 +265,12 @@ async function fetchJsonArray(url: string): Promise<unknown> {
     headers: { Accept: 'application/json', 'User-Agent': 'RhythmMania/1.0 (+catalog-search)' },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`mirror search failed (${response.status})`);
-  const headers = (response as unknown as { headers?: { get?: (name: string) => string | null } }).headers;
-  const contentLength = Number(headers?.get?.('content-length'));
-  if (Number.isFinite(contentLength) && contentLength > MAX_UPSTREAM_JSON_BYTES) {
-    throw new Error('mirror search payload too large');
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error(`mirror search failed (${response.status})`);
   }
-  // Prefer text+byte-cap when available; fall back to json() for stubbed responses.
-  const textFn = (response as unknown as { text?: () => Promise<string> }).text;
-  if (typeof textFn === 'function') {
-    const text = await textFn.call(response);
-    if (new TextEncoder().encode(text).byteLength > MAX_UPSTREAM_JSON_BYTES) {
-      throw new Error('mirror search payload too large');
-    }
-    return JSON.parse(text);
-  }
-  return response.json();
+  const body = await readBoundedResponse(response, MAX_UPSTREAM_JSON_BYTES);
+  return JSON.parse(await body.text());
 }
 
 /**

@@ -106,11 +106,7 @@ function stubFetch(handler: (url: string) => unknown) {
     vi.fn(async (url: unknown) => {
       const result = handler(String(url));
       if (result instanceof Error) throw result;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => result,
-      };
+      return Response.json(result);
     }),
   );
 }
@@ -247,6 +243,25 @@ describe('mapNekohaSet', () => {
 });
 
 describe('searchMirrorCatalog failover', () => {
+  it('cancels oversized JSON while streaming and tries the fallback mirror', async () => {
+    const cancel = vi.fn();
+    let chunks = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('nekoha')) return Response.json({ beatmapsets: [NEKOHA_SET] });
+      return new Response(new ReadableStream({
+        pull(controller) {
+          if (++chunks <= 4) controller.enqueue(new Uint8Array(1024 * 1024));
+          else controller.close();
+        },
+        cancel,
+      }, { highWaterMark: 0 }));
+    }));
+    const sets = await searchMirrorCatalog('neko song', ['loved']);
+    expect(sets[0]?.sourceSetId).toBe(789012);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(chunks).toBe(3);
+  });
+
   it('returns catboy results without calling nekoha', async () => {
     const seen: string[] = [];
     stubFetch((url) => {

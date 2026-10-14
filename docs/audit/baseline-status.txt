@@ -1,0 +1,8 @@
+﻿ M src/App.tsx
+ M src/components/ModSelectOverlay.tsx
+ M src/ui/lazer/index.ts
+ M src/ui/lazer/motion.ts
+ M src/ui/lazer/tokens.css
+?? docs/audit/
+?? tests/fluid-baseline.test.ts
+?? tests/mod-column-geometry.test.ts

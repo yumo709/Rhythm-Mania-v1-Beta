@@ -47,7 +47,7 @@ import LoadingScreen from './components/LoadingScreen';
 import { downloadBeatmapsetArchive, searchOsuBeatmapSetId } from './utils/osuTokenManager';
 import { resolveSkinTheme } from './render/skinTheme';
 import { cssColorToHex, parseCssColor } from './render/color';
-import { applyLazerChrome, LazerDebugSmoke, LazerToolbar, NowPlayingPanel } from './ui/lazer';
+import { applyLazerChrome, LazerDebugSmoke, LazerToolbar, NowPlayingPanel, updateRmUnit } from './ui/lazer';
 import { clampSeekTarget, pickAdjacentIndex, resolveNowPlayingTrack, shouldRestartTrack, type NowPlayingTrack } from './utils/nowPlaying';
 import type { LazerMenuPhase } from './components/MainMenu';
 import LazerCursor from './components/LazerCursor';
@@ -313,6 +313,15 @@ export default function App() {
       applyLazerChrome(settings);
     }
   }, [settings]);
+
+  // Keep the fluid --rm-u scale (1366x768 baseline) live across resizes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    updateRmUnit();
+    const onResize = () => updateRmUnit();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [activeReplayRecord, setActiveReplayRecord] = useState<PlayHistoryRecord | null>(null);
   const [downloadingSetIds, setDownloadingSetIds] = useState<number[]>([]);
